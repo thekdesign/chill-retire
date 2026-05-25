@@ -34,7 +34,7 @@
 </template>
 
 <script>
-import {ref, watch, computed} from 'vue';
+import {ref, computed} from 'vue';
 
 export default {
     name: 'NumberInput',
