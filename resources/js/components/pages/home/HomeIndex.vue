@@ -1,0 +1,363 @@
+<template>
+    <div class="max-w-[1100px] mx-auto px-5 sm:px-7">
+        <!-- Hero -->
+        <section class="pt-10 sm:pt-16 pb-12 grid md:grid-cols-2 gap-10 items-center">
+            <div class="space-y-5 animate-fade-up">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sunset-100 text-sunset-700 text-xs font-medium">
+                    <span class="w-1.5 h-1.5 rounded-full bg-sunset-500"></span>
+                    台灣本地化 · 純前端 · 無需註冊
+                </div>
+                <h1 class="font-display text-4xl sm:text-5xl font-bold text-clay-900 leading-tight tracking-tight">
+                    算算看，<br />
+                    你幾歲可以
+                    <span class="text-sunset-500">悠悠哉哉</span>
+                    退休？
+                </h1>
+                <p class="text-base sm:text-lg text-clay-600 leading-relaxed">
+                    結合 FIRE 國際標準與台灣勞保勞退算法，<br class="hidden sm:block" />
+                    5 分鐘填完，看見 5 種退休情境的全景。
+                </p>
+                <div class="flex gap-3 pt-2">
+                    <a
+                        href="#calculator"
+                        class="inline-flex items-center gap-2 px-6 py-3 bg-sunset-500 hover:bg-sunset-600 active:bg-sunset-700 text-white font-medium rounded-full shadow-soft hover:shadow-soft-lg transition-all"
+                    >
+                        ☀️ 開始試算
+                    </a>
+                </div>
+            </div>
+            <div class="relative">
+                <HeroHammock class="w-full max-w-md mx-auto animate-gentle-float" />
+            </div>
+        </section>
+
+        <!-- 三大特點卡片（純展示） -->
+        <section class="grid sm:grid-cols-3 gap-4 pb-12">
+            <div class="bg-white rounded-xl2 p-5 shadow-soft border border-cream-200">
+                <PiggyBank class="w-14 h-14 mb-2" />
+                <h3 class="font-bold text-clay-900 mb-1">5 種情境並列</h3>
+                <p class="text-sm text-clay-600">Lean / Standard / Fat / Barista FIRE + 台灣傳統 65 歲退休一次看。</p>
+            </div>
+            <div class="bg-white rounded-xl2 p-5 shadow-soft border border-cream-200">
+                <GrowingTree class="w-14 h-14 mb-2" />
+                <h3 class="font-bold text-clay-900 mb-1">資產成長曲線</h3>
+                <p class="text-sm text-clay-600">看見從現在到退休、再到 90 歲的整段現金流變化。</p>
+            </div>
+            <div class="bg-white rounded-xl2 p-5 shadow-soft border border-cream-200">
+                <SunIcon class="w-14 h-14 mb-2 text-sunset-500" />
+                <h3 class="font-bold text-clay-900 mb-1">台灣專版算法</h3>
+                <p class="text-sm text-clay-600">勞保 1.55% × 年資、勞退新制 6% 提撥、國民年金擇優公式。</p>
+            </div>
+        </section>
+
+        <!-- 計算表單 -->
+        <section id="calculator" class="bg-white rounded-blob shadow-soft-lg border border-cream-200 p-6 sm:p-10 mb-16">
+            <header class="mb-8">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-matcha-100 text-matcha-700 text-xs font-medium mb-3">
+                    Step by step
+                </div>
+                <h2 class="font-display text-2xl sm:text-3xl font-bold text-clay-900 mb-2">先告訴我你現在的狀態</h2>
+                <p class="text-clay-600">不用註冊，所有資料只存在你的瀏覽器，重新整理也不會消失。</p>
+            </header>
+
+            <!-- Step 1 基本 -->
+            <div class="space-y-5 mb-10">
+                <h3 class="flex items-center gap-2 text-lg font-bold text-clay-800">
+                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-sunset-500 text-white text-sm font-bold">1</span>
+                    基本資料
+                </h3>
+                <div class="grid sm:grid-cols-2 gap-5">
+                    <FormField label="你現在幾歲？" hint="歲">
+                        <NumberInput
+                            v-model="profile.currentAge"
+                            :min="18"
+                            :max="70"
+                            suffix="歲"
+                            @update:model-value="onChange"
+                        />
+                    </FormField>
+                    <FormField label="希望幾歲退休？" hint="歲" help="只是目標，後續會幫你算實際幾歲可以達標">
+                        <NumberInput
+                            v-model="profile.targetRetireAge"
+                            :min="35"
+                            :max="75"
+                            suffix="歲"
+                            @update:model-value="onChange"
+                        />
+                    </FormField>
+                    <FormField label="目前月收入" hint="稅後實領">
+                        <NumberInput
+                            v-model="profile.monthlyIncome"
+                            prefix="NT$"
+                            :min="0"
+                            :step="1000"
+                            format-thousands
+                            @update:model-value="onChange"
+                        />
+                    </FormField>
+                    <FormField label="目前月支出" hint="日常+房租房貸+娛樂">
+                        <NumberInput
+                            v-model="profile.monthlyExpense"
+                            prefix="NT$"
+                            :min="0"
+                            :step="1000"
+                            format-thousands
+                            @update:model-value="onChange"
+                        />
+                    </FormField>
+                </div>
+                <div class="bg-matcha-50 border border-matcha-200 rounded-xl px-4 py-3 text-sm text-matcha-700">
+                    👉 你目前的儲蓄率是
+                    <span class="font-bold text-matcha-800 font-tabular">{{ savingsRatePercent }}</span>
+                    （每月可存 <span class="font-bold font-tabular">{{ monthlySavingsDisplay }}</span>）
+                </div>
+            </div>
+
+            <!-- Step 2 資產 -->
+            <div class="space-y-5 mb-10">
+                <h3 class="flex items-center gap-2 text-lg font-bold text-clay-800">
+                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-sunset-500 text-white text-sm font-bold">2</span>
+                    現有資產
+                </h3>
+                <FormField
+                    label="現有可投資資產"
+                    help="股票、ETF、基金、現金、定存的總和。自住房不計入（你不會賣它來退休）"
+                >
+                    <NumberInput
+                        v-model="profile.currentAssets"
+                        prefix="NT$"
+                        :min="0"
+                        :step="10000"
+                        format-thousands
+                        @update:model-value="onChange"
+                    />
+                </FormField>
+            </div>
+
+            <!-- Step 3 台灣專版（可選） -->
+            <div class="space-y-5 mb-10">
+                <h3 class="flex items-center gap-2 text-lg font-bold text-clay-800">
+                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-sunset-500 text-white text-sm font-bold">3</span>
+                    勞保勞退（可選）
+                </h3>
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input
+                        v-model="profile.twEnabled"
+                        type="checkbox"
+                        class="w-5 h-5 rounded border-cream-400 text-sunset-500 focus:ring-sunset-400"
+                        @change="onChange"
+                    />
+                    <span class="text-sm text-clay-700">把勞保 / 勞退 / 國民年金算進去（推薦台灣勞工）</span>
+                </label>
+
+                <div v-if="profile.twEnabled" class="grid sm:grid-cols-2 gap-5 pt-2 animate-fade-up">
+                    <FormField
+                        label="勞保月投保薪資"
+                        help="勞保局個人專戶可查；上限 NT$ 45,800"
+                    >
+                        <NumberInput
+                            v-model="profile.averageInsuredSalary"
+                            prefix="NT$"
+                            :min="28590"
+                            :max="45800"
+                            :step="100"
+                            format-thousands
+                            @update:model-value="onChange"
+                        />
+                    </FormField>
+                    <FormField
+                        label="目前勞保年資"
+                        help="累計參加勞保的年數"
+                    >
+                        <NumberInput
+                            v-model="profile.laborInsuranceYears"
+                            suffix="年"
+                            :min="0"
+                            :max="50"
+                            @update:model-value="onChange"
+                        />
+                    </FormField>
+                    <FormField
+                        label="勞退個人專戶現有餘額"
+                        help="勞保局網站可查"
+                    >
+                        <NumberInput
+                            v-model="profile.laborPensionBalance"
+                            prefix="NT$"
+                            :min="0"
+                            :step="10000"
+                            format-thousands
+                            @update:model-value="onChange"
+                        />
+                    </FormField>
+                    <FormField
+                        label="勞退自提率"
+                        help="雇主固定 6%，你可以再自提 0–6%（享稅優）"
+                    >
+                        <RangeSlider
+                            v-model="laborPensionEmployeeRatePercent"
+                            :min="0"
+                            :max="6"
+                            :step="1"
+                            :format="(v) => `${v}%`"
+                            @update:model-value="onEmployeeRateChange"
+                        />
+                    </FormField>
+                </div>
+            </div>
+
+            <!-- 進階假設（摺疊） -->
+            <details class="border border-cream-300 rounded-xl px-5 py-3 mb-10 group">
+                <summary class="cursor-pointer text-sm font-medium text-clay-700 list-none flex items-center justify-between">
+                    <span class="flex items-center gap-2">
+                        <span class="text-base">⚙️</span> 進階假設（通膨、報酬率、預期壽命）
+                    </span>
+                    <span class="text-clay-400 transition-transform group-open:rotate-180">▾</span>
+                </summary>
+                <div class="grid sm:grid-cols-2 gap-5 pt-5">
+                    <FormField
+                        label="年通膨率"
+                        :help="`預設 ${(0.025 * 100).toFixed(1)}%，台灣近十年平均約 1.5–2%`"
+                    >
+                        <RangeSlider
+                            v-model="inflationPercent"
+                            :min="0"
+                            :max="6"
+                            :step="0.5"
+                            :format="(v) => `${v}%`"
+                            @update:model-value="onInflationChange"
+                        />
+                    </FormField>
+                    <FormField
+                        label="退休前報酬率"
+                        help="股票多會用 7-8%；保守可填 5%"
+                    >
+                        <RangeSlider
+                            v-model="preReturnPercent"
+                            :min="2"
+                            :max="12"
+                            :step="0.5"
+                            :format="(v) => `${v}%`"
+                            @update:model-value="onPreReturnChange"
+                        />
+                    </FormField>
+                    <FormField
+                        label="安全提領率"
+                        help="4% rule 是經典標準；早退建議 3.5%"
+                    >
+                        <RangeSlider
+                            v-model="swrPercent"
+                            :min="2"
+                            :max="6"
+                            :step="0.25"
+                            :format="(v) => `${v}%`"
+                            @update:model-value="onSwrChange"
+                        />
+                    </FormField>
+                    <FormField
+                        label="預期壽命"
+                        help="保守規劃建議拉到 90–95 歲，避免長壽風險"
+                    >
+                        <NumberInput
+                            v-model="lifeExpectancy"
+                            suffix="歲"
+                            :min="70"
+                            :max="100"
+                            @update:model-value="onLifeExpectancyChange"
+                        />
+                    </FormField>
+                </div>
+            </details>
+
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between pt-2 border-t border-cream-200">
+                <button
+                    type="button"
+                    class="text-sm text-clay-500 hover:text-clay-700 self-start sm:self-auto"
+                    @click="resetProfile"
+                >
+                    ↻ 重設為預設值
+                </button>
+                <RouterLink
+                    :to="{name: 'RESULT_INDEX'}"
+                    class="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-sunset-500 hover:bg-sunset-600 active:bg-sunset-700 text-white font-bold rounded-full shadow-soft hover:shadow-soft-lg transition-all"
+                >
+                    看我的退休全景 →
+                </RouterLink>
+            </div>
+        </section>
+    </div>
+</template>
+
+<script>
+import {computed} from 'vue';
+import {useProfileStore} from 'stores/profile/profile';
+import {formatTwdShort, formatPercent} from 'formatters/number/currency';
+import HeroHammock from 'components/illustrations/HeroHammock.vue';
+import PiggyBank from 'components/illustrations/PiggyBank.vue';
+import GrowingTree from 'components/illustrations/GrowingTree.vue';
+import SunIcon from 'components/illustrations/SunIcon.vue';
+import FormField from 'components/common/FormField.vue';
+import NumberInput from 'components/common/NumberInput.vue';
+import RangeSlider from 'components/common/RangeSlider.vue';
+
+export default {
+    name: 'HomeIndex',
+    components: {HeroHammock, PiggyBank, GrowingTree, SunIcon, FormField, NumberInput, RangeSlider},
+    setup() {
+        const profile = useProfileStore();
+
+        const savingsRatePercent = computed(() => formatPercent(profile.savingsRate, 0));
+        const monthlySavingsDisplay = computed(() => formatTwdShort(profile.monthlySavings));
+
+        const laborPensionEmployeeRatePercent = computed({
+            get: () => Math.round((profile.laborPensionEmployeeRate || 0) * 100),
+            set: (v) => { profile.laborPensionEmployeeRate = v / 100; profile.persist(); },
+        });
+
+        const inflationPercent = computed({
+            get: () => Number((profile.assumptions.inflationRate * 100).toFixed(1)),
+            set: (v) => profile.updateAssumption('inflationRate', v / 100),
+        });
+        const preReturnPercent = computed({
+            get: () => Number((profile.assumptions.preRetirementReturn * 100).toFixed(1)),
+            set: (v) => profile.updateAssumption('preRetirementReturn', v / 100),
+        });
+        const swrPercent = computed({
+            get: () => Number((profile.assumptions.safeWithdrawalRate * 100).toFixed(2)),
+            set: (v) => profile.updateAssumption('safeWithdrawalRate', v / 100),
+        });
+        const lifeExpectancy = computed({
+            get: () => profile.assumptions.lifeExpectancy,
+            set: (v) => profile.updateAssumption('lifeExpectancy', v),
+        });
+
+        const onChange = () => profile.persist();
+        const onEmployeeRateChange = (v) => { profile.laborPensionEmployeeRate = v / 100; profile.persist(); };
+        const onInflationChange = (v) => profile.updateAssumption('inflationRate', v / 100);
+        const onPreReturnChange = (v) => profile.updateAssumption('preRetirementReturn', v / 100);
+        const onSwrChange = (v) => profile.updateAssumption('safeWithdrawalRate', v / 100);
+        const onLifeExpectancyChange = (v) => profile.updateAssumption('lifeExpectancy', v);
+        const resetProfile = () => {
+            if (window.confirm('確定要重設所有欄位嗎？')) profile.reset();
+        };
+
+        return {
+            profile,
+            savingsRatePercent,
+            monthlySavingsDisplay,
+            laborPensionEmployeeRatePercent,
+            inflationPercent,
+            preReturnPercent,
+            swrPercent,
+            lifeExpectancy,
+            onChange,
+            onEmployeeRateChange,
+            onInflationChange,
+            onPreReturnChange,
+            onSwrChange,
+            onLifeExpectancyChange,
+            resetProfile,
+        };
+    },
+};
+</script>

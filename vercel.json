@@ -1,0 +1,7 @@
+{
+    "buildCommand": "npm run production",
+    "outputDirectory": "public",
+    "framework": null,
+    "cleanUrls": true,
+    "trailingSlash": false
+}
