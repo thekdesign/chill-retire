@@ -9,30 +9,15 @@
  * 所以可在 vite-ssg prerender 環境 import 此檔，client hydration 時 chart 才 init。
  */
 
-import {
-    Chart as ChartJS,
-    LineController,
-    CategoryScale,
-    LinearScale,
-    PointElement,
-    LineElement,
-    Tooltip,
-    Filler,
-} from 'chart.js';
+import {Chart as ChartJS, registerables} from 'chart.js';
 
 let registered = false;
 
 export const setupChartJs = () => {
     if (registered) return;
-    ChartJS.register(
-        LineController,    // 沒它就不會畫 line 圖表類型
-        CategoryScale,
-        LinearScale,
-        PointElement,
-        LineElement,
-        Tooltip,
-        Filler,
-    );
+    // 逐個 register 容易遺漏 controller/scale/element/plugin，
+    // bundle 略大但穩定優先 → 全部塞進去
+    ChartJS.register(...registerables);
 
     // 全站預設樣式
     ChartJS.defaults.font.family = '"Noto Sans TC", system-ui, -apple-system, sans-serif';

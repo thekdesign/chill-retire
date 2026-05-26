@@ -42,7 +42,8 @@ export default {
                 if (!el) throw new Error('找不到分享卡元素');
 
                 const canvas = await html2canvas(el, {
-                    backgroundColor: null,
+                    // 給 solid fallback，避免 gradient 偶爾渲染失敗時拍出全透明
+                    backgroundColor: '#F47C1B',
                     scale: 2,
                     logging: false,
                     useCORS: true,

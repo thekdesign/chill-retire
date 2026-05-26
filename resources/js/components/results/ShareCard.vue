@@ -96,6 +96,8 @@ export default {
     pointer-events: none;
     z-index: -1;
     color: #FFFFFF;
+    /* html2canvas-pro 對 gradient 偶有渲染失敗，雙保險：solid + gradient */
+    background-color: #F47C1B;
     background-image: linear-gradient(135deg, #FFB76C 0%, #F47C1B 45%, #D8682B 100%);
     border-radius: 32px;
     overflow: hidden;
