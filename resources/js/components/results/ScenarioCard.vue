@@ -48,15 +48,9 @@
                 <!-- 資產成長 sparkline -->
                 <div v-if="result.growthCurve && result.growthCurve.length > 1">
                     <div class="text-xs font-medium text-clay-600 mb-1">資產成長軌跡</div>
-                    <GrowthSparkline :points="result.growthCurve" :color="scenario.chartColor" />
+                    <GrowthSparkline :points="result.growthCurve" />
                     <div class="flex justify-between text-[0.65rem] text-clay-400 mt-1.5">
-                        <span>
-                            <span
-                                class="inline-block w-2 h-2 rounded-sm align-middle mr-1"
-                                :style="{backgroundColor: scenario.chartColor}"
-                            ></span>
-                            累積期
-                        </span>
+                        <span><span class="inline-block w-2 h-2 bg-sunset-400 rounded-sm align-middle mr-1"></span>累積期</span>
                         <span><span class="inline-block w-2 h-2 border border-clay-400 border-dashed rounded-sm align-middle mr-1"></span>提領期</span>
                     </div>
                 </div>

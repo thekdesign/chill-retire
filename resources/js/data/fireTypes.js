@@ -23,7 +23,6 @@ export const FIRE_TYPES = Object.freeze([
         expenseMultiplier: 0.7,
         portfolioCoverage: 1.0,
         color: 'matcha',
-        chartColor: '#5E7F3F',       // matcha-500（綠）
     },
     {
         key: 'standard',
@@ -35,7 +34,6 @@ export const FIRE_TYPES = Object.freeze([
         expenseMultiplier: 1.0,
         portfolioCoverage: 1.0,
         color: 'sunset',
-        chartColor: '#F47C1B',       // sunset-500（橘）
     },
     {
         key: 'fat',
@@ -47,7 +45,6 @@ export const FIRE_TYPES = Object.freeze([
         expenseMultiplier: 1.5,
         portfolioCoverage: 1.0,
         color: 'apricot',
-        chartColor: '#D8682B',       // apricot-500（深橘）
     },
     {
         key: 'barista',
@@ -59,7 +56,6 @@ export const FIRE_TYPES = Object.freeze([
         expenseMultiplier: 1.0,
         portfolioCoverage: 0.7,
         color: 'clay',
-        chartColor: '#6E6452',       // clay-500（暖灰）
     },
     {
         key: 'tw65',
@@ -71,7 +67,6 @@ export const FIRE_TYPES = Object.freeze([
         expenseMultiplier: 1.0,
         portfolioCoverage: 0,
         color: 'cream',
-        chartColor: '#8F7D4B',       // cream-600（金棕）
         fixedRetireAge: 65,
     },
 ]);

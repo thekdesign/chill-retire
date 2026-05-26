@@ -22,23 +22,25 @@ export const realReturn = (nominalReturn, inflationRate) => (1 + nominalReturn) 
 
 /**
  * 計算指定年齡的年度收入。
+ *
+ * 邊界規則：retireAge 那一年算「最後一年工作」，仍有主薪資。
+ * 從 retireAge + 1 開始才完全退休（NHI 自付、side income、退休後支出倍率全部套用）。
  */
 const annualIncomeAt = (age, profile, retireAge) => {
     let income = 0;
 
-    // 主薪資：退休前
-    if (age < retireAge) {
+    // 主薪資：含 retireAge 那年（最後一年工作）
+    if (age <= retireAge) {
         if (profile.gradualEnabled && age >= profile.gradualStartAge) {
-            // 漸進式退休：55-60 期間半薪
             income += profile.monthlyIncome * 12 * profile.gradualPercentage;
         } else {
             income += profile.monthlyIncome * 12;
         }
     }
 
-    // 退休後 side income（顧問/兼職）
-    if (age >= retireAge && profile.sideIncomeMonthly > 0) {
-        const startAge = profile.sideIncomeStartAge || retireAge;
+    // 退休後 side income：retireAge + 1 起
+    if (age > retireAge && profile.sideIncomeMonthly > 0) {
+        const startAge = profile.sideIncomeStartAge || (retireAge + 1);
         if (age >= startAge && age <= profile.sideIncomeEndAge) {
             income += profile.sideIncomeMonthly * 12;
         }
@@ -55,9 +57,8 @@ const annualIncomeAt = (age, profile, retireAge) => {
 /**
  * 計算指定年齡的年度支出。
  *
- * 重要：scenario.expenseMultiplier（Lean 0.7 / Fat 1.5 等）只在「退休後」套用，
- * 累積期一律用使用者填的當前 monthlyExpense。
- * 這樣才符合 FIRE 變體的真實意涵：「退休後想過什麼生活水準」。
+ * 邊界：retireAge 那年仍算「最後一年工作」→ 用當前支出、無 NHI 自付。
+ * 從 retireAge + 1 起套用 scenario.expenseMultiplier + 退休後健保。
  */
 const annualExpenseAt = (age, profile, retireAge, scenario) => {
     const multiplier = age > retireAge ? (scenario?.expenseMultiplier || 1) : 1;
@@ -77,8 +78,8 @@ const annualExpenseAt = (age, profile, retireAge, scenario) => {
         }
     }
 
-    // 退休後健保自負額（無雇主補貼）
-    if (age >= retireAge && profile.postRetirementNhiEnabled) {
+    // 退休後健保自負額（無雇主補貼）— retireAge + 1 起
+    if (age > retireAge && profile.postRetirementNhiEnabled) {
         expense += (profile.postRetirementNhiMonthly || 0) * 12;
     }
 
