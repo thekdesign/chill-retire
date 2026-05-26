@@ -68,6 +68,38 @@
             :retire-age="primary.result.retireAge"
             :life-expectancy="profile.effectiveAssumptions.lifeExpectancy"
         />
+        <section v-else class="mb-12 animate-fade-up">
+            <header class="mb-5">
+                <h2 class="font-display text-2xl font-bold text-clay-900 mb-1">
+                    🎲 1000 種市場走勢，你的劇本
+                </h2>
+                <p class="text-clay-600 text-sm">Monte Carlo 模擬市場波動下的成功機率</p>
+            </header>
+            <div class="bg-white rounded-blob shadow-soft border border-cream-200 p-6 sm:p-8">
+                <div class="flex items-start gap-3">
+                    <span class="text-3xl">🚧</span>
+                    <div>
+                        <div class="font-bold text-clay-900 mb-1">目前沒有可模擬的退休路徑</div>
+                        <p class="text-sm text-clay-600 leading-relaxed mb-3">
+                            <template v-if="profile.monthlySavings <= 0">
+                                你目前月支出
+                                <strong class="font-tabular">{{ formatTwd(profile.monthlyExpense) }}</strong>
+                                ≥ 月收入
+                                <strong class="font-tabular">{{ formatTwd(profile.monthlyIncome) }}</strong>，
+                                每月儲蓄為 0 或負值 → 無法累積退休本金。
+                            </template>
+                            <template v-else>
+                                以目前儲蓄速度，在 80 歲前無法達到「年支出 × 25」的退休門檻。
+                                資產還沒進入「提領期」的階段，沒有市場波動可模擬。
+                            </template>
+                        </p>
+                        <p class="text-sm text-clay-700">
+                            💡 試試：拖上面滑桿提高收入、降低支出，或延後退休年齡 — 一旦有「主推情境」能達標，這裡就會出現 Monte Carlo fan chart。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <!-- 黑天鵝壓力測試 -->
         <StressTestPanel />
