@@ -30,9 +30,27 @@ const defaultProfile = () => ({
     // 進階生活情境（摺疊區塊，預設「不買房、0 小孩」對主流程零影響）
     housingStatus: 'none',             // 'none' | 'planning' | 'owned'
     housingDownPayment: 1500000,       // 計畫買時的頭期款（NT$）
+    housingYearsUntilPurchase: 5,      // 幾年後買
+    housingMonthlyMortgage: 25000,     // 月貸款
+    housingMortgageYears: 20,          // 貸款年限
     kidsCount: 0,
-    kidsCostPerMonth: 15000,           // 每個小孩月支出（粗估，可調）
-    kidsSupportYears: 20,              // 從現在算起扶養年數（簡化模型）
+    kidsCostPerMonth: 15000,
+    kidsSupportYears: 22,              // 0 → 22 歲扶養（國際標準）
+    // 退休後 side income（顧問/兼職/版稅）
+    sideIncomeMonthly: 0,              // 0 = 沒有
+    sideIncomeStartAge: 0,             // 0 表示「從退休那年開始」
+    sideIncomeEndAge: 75,              // 預設做到 75 歲
+    // 漸進式退休（半薪過渡期）
+    gradualEnabled: false,
+    gradualStartAge: 55,               // 從幾歲開始半薪
+    gradualPercentage: 0.5,            // 半薪 = 0.5
+    // 退休後健保自負額（多數人忽略）
+    postRetirementNhiEnabled: true,
+    postRetirementNhiMonthly: 6400,    // 2026 級距估值（無雇主補貼）
+    // 長照預備金（晚年加速上升）
+    longTermCareEnabled: false,
+    longTermCareStartAge: 75,
+    longTermCareMonthly: 30000,
     // Step 4 假設（預設投資策略 = 平衡 60/40）
     assumptions: {...DEFAULT_ASSUMPTIONS},
     // 壓力測試 mode（不持久化）
@@ -82,20 +100,17 @@ export const useProfileStore = defineStore('profile', {
                 level: ratio >= 1 ? 'achieved' : ratio >= 0.5 ? 'partial' : 'low',
             };
         },
-        // 房屋頭期款預留（計畫買 = 從可投資資產裡扣除；已買 = 0；不買 = 0）
+        // 房屋總成本（資訊用 — 給 UI 顯示，年度模擬會分散到各年）
         housingDeduction(state) {
             return state.housingStatus === 'planning' ? (state.housingDownPayment || 0) : 0;
         },
-        // 小孩終身扶養成本（簡化：人數 × 月支出 × 12 × 扶養年數）
         kidsLifetimeCost(state) {
             return (state.kidsCount || 0) * (state.kidsCostPerMonth || 0) * 12 * (state.kidsSupportYears || 0);
         },
-        // 從現有資產扣除緊急預備金 + 房屋頭期 + 小孩成本 = 真正可投入退休的資產
+        // 可投資資產 = 總資產 - 緊急預備金。
+        // 房/小孩在年度模擬內逐年扣，這裡不預扣。
         investableAssets(state) {
-            const deductions = (state.emergencyFundCurrent || 0)
-                + this.housingDeduction
-                + this.kidsLifetimeCost;
-            return Math.max(0, state.currentAssets - deductions);
+            return Math.max(0, state.currentAssets - (state.emergencyFundCurrent || 0));
         },
         // 投資策略：從目前 assumptions 反推（手動改過就變 custom）
         investmentStrategyKey(state) {
@@ -110,18 +125,49 @@ export const useProfileStore = defineStore('profile', {
             const stress = getStressTest(state.stressMode);
             return stress ? stress.modify(state.assumptions) : state.assumptions;
         },
+        // 給 fireCalculator / monteCarloSim 用的「完整 profile snapshot」
+        // 把所有跟年度模擬有關的欄位打包，避免每個 getter 重複寫
+        simulationProfile(state) {
+            return {
+                currentAge: state.currentAge,
+                monthlyIncome: state.monthlyIncome,
+                monthlyExpense: state.monthlyExpense,
+                targetRetireAge: state.targetRetireAge,
+                investableAssets: this.investableAssets,
+                // 房
+                housingStatus: state.housingStatus,
+                housingDownPayment: state.housingDownPayment,
+                housingYearsUntilPurchase: state.housingYearsUntilPurchase,
+                housingMonthlyMortgage: state.housingMonthlyMortgage,
+                housingMortgageYears: state.housingMortgageYears,
+                // 小孩
+                kidsCount: state.kidsCount,
+                kidsCostPerMonth: state.kidsCostPerMonth,
+                kidsSupportYears: state.kidsSupportYears,
+                // 退休後 side income
+                sideIncomeMonthly: state.sideIncomeMonthly,
+                sideIncomeStartAge: state.sideIncomeStartAge,
+                sideIncomeEndAge: state.sideIncomeEndAge,
+                // 漸進式退休
+                gradualEnabled: state.gradualEnabled,
+                gradualStartAge: state.gradualStartAge,
+                gradualPercentage: state.gradualPercentage,
+                // 退休後支出
+                postRetirementNhiEnabled: state.postRetirementNhiEnabled,
+                postRetirementNhiMonthly: state.postRetirementNhiMonthly,
+                longTermCareEnabled: state.longTermCareEnabled,
+                longTermCareStartAge: state.longTermCareStartAge,
+                longTermCareMonthly: state.longTermCareMonthly,
+                // 政府年金（讓 sim 65 歲後加入）
+                twCashflow: this.twCashflow,
+            };
+        },
         scenarios(state) {
             const assumptions = this.effectiveAssumptions;
-            const investable = this.investableAssets;
+            const simProfile = this.simulationProfile;
             return FIRE_TYPES.map((type) => ({
                 type,
-                result: calculateScenario(type, {
-                    currentAge: state.currentAge,
-                    monthlyIncome: state.monthlyIncome,
-                    monthlyExpense: state.monthlyExpense,
-                    targetRetireAge: state.targetRetireAge,
-                    currentAssets: investable,
-                }, assumptions),
+                result: calculateScenario(type, simProfile, assumptions),
             }));
         },
         twCashflow(state) {
@@ -150,11 +196,9 @@ export const useProfileStore = defineStore('profile', {
             const meanReturn = realReturn(assumptions.postRetirementReturn, assumptions.inflationRate);
             const stress = this.stressTest;
             return runMonteCarlo({
-                currentAge: state.currentAge,
-                currentAssets: this.investableAssets,
-                annualContribution: this.monthlySavings * 12,
-                annualExpense: primary.result.annualExpense,
+                profile: this.simulationProfile,
                 retireAge: primary.result.retireAge,
+                scenario: primary.type,
                 lifeExpectancy: assumptions.lifeExpectancy,
                 meanReturn,
                 stdDev: assumptions.portfolioVolatility,
@@ -204,7 +248,13 @@ export const useProfileStore = defineStore('profile', {
                     twEnabled, averageInsuredSalary, laborInsuranceYears,
                     laborPensionBalance, laborPensionEmployeeRate, nationalPensionYears,
                     laborInsurancePayout,
-                    housingStatus, housingDownPayment, kidsCount, kidsCostPerMonth, kidsSupportYears,
+                    housingStatus, housingDownPayment, housingYearsUntilPurchase,
+                    housingMonthlyMortgage, housingMortgageYears,
+                    kidsCount, kidsCostPerMonth, kidsSupportYears,
+                    sideIncomeMonthly, sideIncomeStartAge, sideIncomeEndAge,
+                    gradualEnabled, gradualStartAge, gradualPercentage,
+                    postRetirementNhiEnabled, postRetirementNhiMonthly,
+                    longTermCareEnabled, longTermCareStartAge, longTermCareMonthly,
                     assumptions,
                 } = this;
                 window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -213,7 +263,13 @@ export const useProfileStore = defineStore('profile', {
                     twEnabled, averageInsuredSalary, laborInsuranceYears,
                     laborPensionBalance, laborPensionEmployeeRate, nationalPensionYears,
                     laborInsurancePayout,
-                    housingStatus, housingDownPayment, kidsCount, kidsCostPerMonth, kidsSupportYears,
+                    housingStatus, housingDownPayment, housingYearsUntilPurchase,
+                    housingMonthlyMortgage, housingMortgageYears,
+                    kidsCount, kidsCostPerMonth, kidsSupportYears,
+                    sideIncomeMonthly, sideIncomeStartAge, sideIncomeEndAge,
+                    gradualEnabled, gradualStartAge, gradualPercentage,
+                    postRetirementNhiEnabled, postRetirementNhiMonthly,
+                    longTermCareEnabled, longTermCareStartAge, longTermCareMonthly,
                     assumptions,
                 }));
             } catch (e) {

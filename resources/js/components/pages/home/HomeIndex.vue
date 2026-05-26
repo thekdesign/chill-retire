@@ -340,11 +340,9 @@
                     <span class="text-clay-400 transition-transform group-open:rotate-180">▾</span>
                 </summary>
                 <div class="pt-5 space-y-6">
-                    <!-- 房 -->
+                    <!-- 🏠 房 -->
                     <div>
-                        <div class="text-sm font-medium text-clay-700 mb-2">
-                            🏠 房屋狀況
-                        </div>
+                        <div class="text-sm font-medium text-clay-700 mb-2">🏠 房屋狀況</div>
                         <div class="grid grid-cols-3 gap-2 mb-3">
                             <button
                                 v-for="opt in housingOptions"
@@ -363,31 +361,27 @@
                                 <div class="text-[0.65rem] text-clay-500 mt-0.5">{{ opt.hint }}</div>
                             </button>
                         </div>
-                        <FormField
-                            v-if="profile.housingStatus === 'planning'"
-                            label="計畫頭期款"
-                            help="買房時要一次性付出，會從可投資資產扣除。台北 2 房約 NT$ 200–400 萬"
-                        >
-                            <NumberInput
-                                v-model="profile.housingDownPayment"
-                                prefix="NT$"
-                                :min="0"
-                                :step="100000"
-                                format-thousands
-                                @update:model-value="onChange"
-                            />
-                        </FormField>
+                        <div v-if="profile.housingStatus === 'planning'" class="grid sm:grid-cols-2 gap-3">
+                            <FormField label="幾年後買" hint="從現在算起">
+                                <NumberInput v-model="profile.housingYearsUntilPurchase" suffix="年" :min="0" :max="30" @update:model-value="onChange" />
+                            </FormField>
+                            <FormField label="頭期款" help="一次性付出，買房當年扣除">
+                                <NumberInput v-model="profile.housingDownPayment" prefix="NT$" :min="0" :step="100000" format-thousands @update:model-value="onChange" />
+                            </FormField>
+                            <FormField label="月貸款" help="買房後每月還款額">
+                                <NumberInput v-model="profile.housingMonthlyMortgage" prefix="NT$" :min="0" :step="1000" format-thousands @update:model-value="onChange" />
+                            </FormField>
+                            <FormField label="貸款年限">
+                                <NumberInput v-model="profile.housingMortgageYears" suffix="年" :min="1" :max="40" @update:model-value="onChange" />
+                            </FormField>
+                        </div>
                     </div>
 
-                    <!-- 小孩 -->
+                    <!-- 👶 小孩 -->
                     <div>
                         <div class="flex items-baseline justify-between mb-2">
-                            <div class="text-sm font-medium text-clay-700">
-                                👶 計畫扶養小孩
-                            </div>
-                            <div class="text-sm font-tabular text-sunset-700 font-bold">
-                                {{ profile.kidsCount }} 個
-                            </div>
+                            <div class="text-sm font-medium text-clay-700">👶 計畫扶養小孩</div>
+                            <div class="text-sm font-tabular text-sunset-700 font-bold">{{ profile.kidsCount }} 個</div>
                         </div>
                         <input
                             type="range"
@@ -401,37 +395,108 @@
                         <div class="flex justify-between text-[0.65rem] text-clay-400 font-tabular -mt-1 mb-3">
                             <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span>
                         </div>
+                        <div v-if="profile.kidsCount > 0" class="grid sm:grid-cols-2 gap-3">
+                            <FormField label="每個小孩月支出" help="食衣住行 + 教育 + 育樂">
+                                <NumberInput v-model="profile.kidsCostPerMonth" prefix="NT$" :min="0" :step="1000" format-thousands @update:model-value="onChange" />
+                            </FormField>
+                            <FormField label="扶養幾年" help="0 → N 歲（國際標準 22）">
+                                <NumberInput v-model="profile.kidsSupportYears" suffix="年" :min="1" :max="30" @update:model-value="onChange" />
+                            </FormField>
+                        </div>
+                    </div>
+
+                    <!-- 💼 退休後 side income -->
+                    <div>
+                        <div class="text-sm font-medium text-clay-700 mb-2">
+                            💼 退休後 side income <span class="text-xs text-clay-500 font-normal">— 顧問、兼職、版稅、租金…</span>
+                        </div>
+                        <FormField label="月收入" hint="設 0 = 完全不做">
+                            <NumberInput v-model="profile.sideIncomeMonthly" prefix="NT$" :min="0" :step="1000" format-thousands @update:model-value="onChange" />
+                        </FormField>
                         <FormField
-                            v-if="profile.kidsCount > 0"
-                            label="每個小孩平均月支出"
-                            help="食衣住行 + 教育 + 育樂。台灣中位數約 NT$ 12,000–18,000"
+                            v-if="profile.sideIncomeMonthly > 0"
+                            label="做到幾歲"
+                            class="mt-3"
+                            help="退休後幾歲完全停下來"
                         >
-                            <NumberInput
-                                v-model="profile.kidsCostPerMonth"
-                                prefix="NT$"
-                                :min="0"
-                                :step="1000"
-                                format-thousands
-                                @update:model-value="onChange"
-                            />
+                            <NumberInput v-model="profile.sideIncomeEndAge" suffix="歲" :min="50" :max="90" @update:model-value="onChange" />
                         </FormField>
                     </div>
 
-                    <!-- 摘要 -->
-                    <div
-                        v-if="lifeScenariosActive"
-                        class="bg-cream-100 border border-cream-300 rounded-xl px-4 py-3 text-sm text-clay-700 leading-relaxed"
-                    >
-                        📝 這些生活情境會從可投資資產一次扣除預留：
-                        <ul class="mt-1.5 space-y-0.5 font-tabular text-clay-800">
-                            <li v-if="profile.housingDeduction > 0">
-                                · 房屋頭期款預留 <strong>{{ formatTwd(profile.housingDeduction) }}</strong>
-                            </li>
-                            <li v-if="profile.kidsLifetimeCost > 0">
-                                · 小孩 20 年扶養成本 <strong>{{ formatTwd(profile.kidsLifetimeCost) }}</strong>
-                                <span class="text-clay-500">（{{ profile.kidsCount }} × {{ formatTwd(profile.kidsCostPerMonth) }}/月 × 12 × 20）</span>
-                            </li>
-                        </ul>
+                    <!-- 🚶 漸進式退休 -->
+                    <div>
+                        <label class="flex items-center gap-3 cursor-pointer mb-2">
+                            <input
+                                v-model="profile.gradualEnabled"
+                                type="checkbox"
+                                class="w-5 h-5 rounded border-cream-400 text-sunset-500 focus:ring-sunset-400"
+                                @change="onChange"
+                            />
+                            <span class="text-sm font-medium text-clay-700">
+                                🚶 漸進式退休 <span class="text-xs text-clay-500 font-normal">— 過渡期半薪先做、再正式退</span>
+                            </span>
+                        </label>
+                        <div v-if="profile.gradualEnabled" class="grid sm:grid-cols-2 gap-3 pl-8">
+                            <FormField label="從幾歲開始半薪">
+                                <NumberInput v-model="profile.gradualStartAge" suffix="歲" :min="40" :max="70" @update:model-value="onChange" />
+                            </FormField>
+                            <FormField label="工作時間比例">
+                                <RangeSlider
+                                    :model-value="Math.round(profile.gradualPercentage * 100)"
+                                    :min="20"
+                                    :max="80"
+                                    :step="10"
+                                    :format="(v) => `${v}%`"
+                                    @update:model-value="updateGradualPercent"
+                                />
+                            </FormField>
+                        </div>
+                    </div>
+
+                    <!-- 🩺 退休後健保 -->
+                    <div>
+                        <label class="flex items-center gap-3 cursor-pointer mb-2">
+                            <input
+                                v-model="profile.postRetirementNhiEnabled"
+                                type="checkbox"
+                                class="w-5 h-5 rounded border-cream-400 text-sunset-500 focus:ring-sunset-400"
+                                @change="onChange"
+                            />
+                            <span class="text-sm font-medium text-clay-700">
+                                🩺 退休後健保 <span class="text-xs text-clay-500 font-normal">— 無雇主補貼，自負額拉高</span>
+                            </span>
+                        </label>
+                        <FormField
+                            v-if="profile.postRetirementNhiEnabled"
+                            label="月健保費"
+                            help="退休後自負額約 NT$ 6,400+（依眷屬數調整）"
+                            class="pl-8"
+                        >
+                            <NumberInput v-model="profile.postRetirementNhiMonthly" prefix="NT$" :min="0" :step="100" format-thousands @update:model-value="onChange" />
+                        </FormField>
+                    </div>
+
+                    <!-- 🦽 長照預備金 -->
+                    <div>
+                        <label class="flex items-center gap-3 cursor-pointer mb-2">
+                            <input
+                                v-model="profile.longTermCareEnabled"
+                                type="checkbox"
+                                class="w-5 h-5 rounded border-cream-400 text-sunset-500 focus:ring-sunset-400"
+                                @change="onChange"
+                            />
+                            <span class="text-sm font-medium text-clay-700">
+                                🦽 長照預備金 <span class="text-xs text-clay-500 font-normal">— 75+ 後可能需要的照護費</span>
+                            </span>
+                        </label>
+                        <div v-if="profile.longTermCareEnabled" class="grid sm:grid-cols-2 gap-3 pl-8">
+                            <FormField label="從幾歲開始" help="保守規劃常用 75 歲">
+                                <NumberInput v-model="profile.longTermCareStartAge" suffix="歲" :min="60" :max="90" @update:model-value="onChange" />
+                            </FormField>
+                            <FormField label="月支出" help="居家照顧 ~3 萬、機構 ~5–8 萬">
+                                <NumberInput v-model="profile.longTermCareMonthly" prefix="NT$" :min="0" :step="1000" format-thousands @update:model-value="onChange" />
+                            </FormField>
+                        </div>
                     </div>
                 </div>
             </details>
@@ -570,8 +635,17 @@ export default {
             profile.persist();
         };
 
+        const updateGradualPercent = (v) => {
+            profile.gradualPercentage = v / 100;
+            profile.persist();
+        };
+
         const lifeScenariosActive = computed(() => (
-            profile.housingStatus === 'planning' || profile.kidsCount > 0
+            profile.housingStatus !== 'none'
+            || profile.kidsCount > 0
+            || profile.sideIncomeMonthly > 0
+            || profile.gradualEnabled
+            || profile.longTermCareEnabled
         ));
 
         const laborPensionEmployeeRatePercent = computed({
@@ -613,6 +687,7 @@ export default {
             housingOptions: HOUSING_OPTIONS,
             setHousing,
             updateKidsCount,
+            updateGradualPercent,
             lifeScenariosActive,
             formatTwd,
             emergencyStatus,

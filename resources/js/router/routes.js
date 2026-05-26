@@ -18,6 +18,12 @@ export const routes = [
                 meta: {title: '你的退休全景'},
             },
             {
+                path: 'glossary',
+                name: PageRoute.GLOSSARY_INDEX.key,
+                component: () => import('components/pages/glossary/GlossaryIndex.vue'),
+                meta: {title: '名詞解釋'},
+            },
+            {
                 path: '404',
                 name: PageRoute.NOT_FOUND.key,
                 component: () => import('components/pages/NotFound.vue'),

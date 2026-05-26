@@ -15,13 +15,19 @@
                         :to="{name: 'HOME_INDEX'}"
                         class="px-3 py-1.5 rounded-full text-sm text-clay-600 hover:text-sunset-700 hover:bg-sunset-50 transition-colors"
                     >
-                        重新計算
+                        試算
                     </RouterLink>
                     <RouterLink
                         :to="{name: 'RESULT_INDEX'}"
                         class="px-3 py-1.5 rounded-full text-sm text-clay-600 hover:text-sunset-700 hover:bg-sunset-50 transition-colors"
                     >
                         結果
+                    </RouterLink>
+                    <RouterLink
+                        :to="{name: 'GLOSSARY_INDEX'}"
+                        class="px-3 py-1.5 rounded-full text-sm text-clay-600 hover:text-sunset-700 hover:bg-sunset-50 transition-colors"
+                    >
+                        名詞
                     </RouterLink>
                 </nav>
             </div>

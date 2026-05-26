@@ -29,7 +29,7 @@ export default mergeConfig(common, {
         script: 'async',
         formatting: 'minify',
         includedRoutes() {
-            return ['/', '/result', '/404'];
+            return ['/', '/result', '/glossary', '/404'];
         },
         mock: true,
     },

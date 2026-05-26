@@ -1,198 +1,221 @@
 /**
- * 退休核心計算邏輯。
+ * 退休核心計算邏輯 — 年度逐年模擬版（M5 重構）。
  *
- * 主要公式：
- *   - 退休金目標 = 退休後年支出 × (1 / 安全提領率)
- *     等同於 25x rule（4% rule 的反算）
- *   - 從現在到退休的資產成長 = FV = PV × (1+r)^n + PMT × [((1+r)^n - 1) / r]
- *     PV = 現有資產、PMT = 每年儲蓄、r = 報酬率、n = 年數
- *   - 通膨調整：所有未來金額換算為「今日購買力」
+ * 跟舊的 steady-state 版本差別：
+ *   - 過去：用 closed-form 公式 + 一次扣除預留估算
+ *   - 現在：每一年單獨計算收入/支出/資產變化，時間維度精準
+ *
+ * 模型涵蓋（按年）：
+ *   - 主薪資（含漸進式退休：55-60 過渡半薪可選）
+ *   - 退休後 side income（顧問費/兼職）
+ *   - 政府年金（65 歲後勞保+勞退+國民年金）
+ *   - 月支出（含小孩 0–22 歲、房貸 N 年、退休後健保、長照 75+）
+ *   - 房屋頭期款（一次性，計畫購買的那一年）
+ *
+ * 所有金額都以「今日購買力」為基準（已在外層 caller 用實質報酬率）。
  */
 
 /**
- * 計算未來資產（複利 + 定期投入）
- * @param {number} currentAssets 現有資產（今日購買力）
- * @param {number} annualContribution 每年儲蓄（今日購買力）
- * @param {number} realReturn 實質報酬率（已扣除通膨）
- * @param {number} years 年數
- * @returns {number} 未來資產（今日購買力）
+ * 計算實質報酬率（扣除通膨後）
  */
-export const projectFutureAssets = (currentAssets, annualContribution, realReturn, years) => {
-    if (years <= 0) return currentAssets;
-    if (realReturn === 0) return currentAssets + annualContribution * years;
-    const growthFactor = (1 + realReturn) ** years;
-    const fvCurrent = currentAssets * growthFactor;
-    const fvContributions = annualContribution * ((growthFactor - 1) / realReturn);
-    return fvCurrent + fvContributions;
+export const realReturn = (nominalReturn, inflationRate) => (1 + nominalReturn) / (1 + inflationRate) - 1;
+
+/**
+ * 計算指定年齡的年度收入。
+ */
+const annualIncomeAt = (age, profile, retireAge) => {
+    let income = 0;
+
+    // 主薪資：退休前
+    if (age < retireAge) {
+        if (profile.gradualEnabled && age >= profile.gradualStartAge) {
+            // 漸進式退休：55-60 期間半薪
+            income += profile.monthlyIncome * 12 * profile.gradualPercentage;
+        } else {
+            income += profile.monthlyIncome * 12;
+        }
+    }
+
+    // 退休後 side income（顧問/兼職）
+    if (age >= retireAge && profile.sideIncomeMonthly > 0) {
+        const startAge = profile.sideIncomeStartAge || retireAge;
+        if (age >= startAge && age <= profile.sideIncomeEndAge) {
+            income += profile.sideIncomeMonthly * 12;
+        }
+    }
+
+    // 65 歲後政府年金
+    if (age >= 65 && profile.twCashflow) {
+        income += profile.twCashflow.totalMonthly * 12;
+    }
+
+    return income;
 };
 
 /**
- * 計算退休金目標（25x rule 或自訂 SWR）
- * @param {number} annualExpenseAtRetirement 退休時年支出（今日購買力）
- * @param {number} swr 安全提領率（如 0.04）
- * @returns {number} 退休金目標
+ * 計算指定年齡的年度支出。
  */
-export const calculateRetirementTarget = (annualExpenseAtRetirement, swr) => annualExpenseAtRetirement / swr;
+const annualExpenseAt = (age, profile, retireAge, scenario) => {
+    let expense = profile.monthlyExpense * 12 * (scenario?.expenseMultiplier || 1);
+
+    // 小孩扶養（從 currentAge 算起 N 年內）
+    const yearsFromNow = age - profile.currentAge;
+    if (profile.kidsCount > 0 && yearsFromNow < profile.kidsSupportYears) {
+        expense += profile.kidsCount * profile.kidsCostPerMonth * 12;
+    }
+
+    // 房貸（計畫買 = 從 yearsUntilPurchase 開始付 mortgageYears 年；已買 = 假設含在 monthlyExpense 不重複）
+    if (profile.housingStatus === 'planning') {
+        const purchaseAge = profile.currentAge + (profile.housingYearsUntilPurchase || 0);
+        if (age >= purchaseAge && age < purchaseAge + (profile.housingMortgageYears || 0)) {
+            expense += (profile.housingMonthlyMortgage || 0) * 12;
+        }
+    }
+
+    // 退休後健保自負額（無雇主補貼）
+    if (age >= retireAge && profile.postRetirementNhiEnabled) {
+        expense += (profile.postRetirementNhiMonthly || 0) * 12;
+    }
+
+    // 長照預備金
+    if (profile.longTermCareEnabled && age >= profile.longTermCareStartAge) {
+        expense += (profile.longTermCareMonthly || 0) * 12;
+    }
+
+    return expense;
+};
 
 /**
- * 反推「幾歲可以退休」：給定每年儲蓄與目標，找出最早達標年齡
- * @param {object} params
- * @param {number} params.currentAge 現在年齡
- * @param {number} params.currentAssets 現有資產
- * @param {number} params.annualContribution 每年儲蓄
- * @param {number} params.realReturn 實質報酬率
- * @param {number} params.target 退休金目標
- * @param {number} params.maxAge 最晚試算到幾歲（避免無窮迴圈）
- * @returns {number|null} 達標年齡；若無法在 maxAge 前達標回傳 null
+ * 計算一次性現金流（買房頭期款）
  */
-export const findRetirementAge = ({
-    currentAge,
-    currentAssets,
-    annualContribution,
-    realReturn,
-    target,
-    maxAge = 80,
+const lumpSumOutflowAt = (age, profile) => {
+    if (profile.housingStatus === 'planning'
+        && age === profile.currentAge + profile.housingYearsUntilPurchase) {
+        return profile.housingDownPayment || 0;
+    }
+    return 0;
+};
+
+/**
+ * 年度逐年模擬：給定假設退休年齡，回傳資產軌跡與成敗。
+ */
+export const simulateYearByYear = ({
+    profile,
+    retireAge,
+    realReturnRate,
+    scenario = null,
+    lifeExpectancy,
+    randomReturns = null,    // Monte Carlo 用：每年的隨機報酬陣列
 }) => {
-    if (currentAssets >= target) return currentAge;
-    for (let age = currentAge + 1; age <= maxAge; age += 1) {
-        const years = age - currentAge;
-        const assets = projectFutureAssets(currentAssets, annualContribution, realReturn, years);
-        if (assets >= target) return age;
+    let assets = profile.investableAssets;
+    const trajectory = [{age: profile.currentAge, assets, phase: 'start'}];
+
+    for (let age = profile.currentAge + 1; age <= lifeExpectancy; age += 1) {
+        const income = annualIncomeAt(age, profile, retireAge);
+        const expense = annualExpenseAt(age, profile, retireAge, scenario);
+        const lumpSum = lumpSumOutflowAt(age, profile);
+        const r = randomReturns ? randomReturns[age - profile.currentAge - 1] : realReturnRate;
+
+        // 先處理現金流，再算利息（保守）
+        assets = assets - lumpSum + (income - expense);
+        if (assets > 0) {
+            assets *= (1 + r);
+        }
+
+        const phase = age <= retireAge ? 'accumulation' : 'withdrawal';
+        trajectory.push({age, assets: Math.max(0, assets), phase});
+
+        if (assets < 0) {
+            return {trajectory, success: false, failedAge: age};
+        }
+    }
+
+    return {trajectory, success: true, failedAge: null};
+};
+
+/**
+ * 找最早可退休年齡：從 currentAge 開始，逐年試假設能撐到 lifeExpectancy。
+ */
+export const findRetirementAge = ({profile, realReturnRate, scenario, lifeExpectancy, maxAge = 80}) => {
+    for (let age = profile.currentAge + 1; age <= maxAge; age += 1) {
+        const sim = simulateYearByYear({profile, retireAge: age, realReturnRate, scenario, lifeExpectancy});
+        if (sim.success) return age;
     }
     return null;
 };
 
 /**
- * 計算 Coast FIRE 狀態：「不再存錢，光複利就能在目標年齡達標」
- * @param {object} params
- * @param {number} params.currentAssets 現有資產
- * @param {number} params.realReturn 實質報酬率
- * @param {number} params.yearsUntilRetire 距離傳統退休年齡的年數
- * @param {number} params.target 退休金目標
- * @returns {{achieved: boolean, projected: number, shortfall: number}}
+ * 計算 FIRE 情境的完整結果（新版用逐年模擬，replace 舊 calculateScenario）。
  */
-export const calculateCoastFire = ({currentAssets, realReturn, yearsUntilRetire, target}) => {
-    const projected = projectFutureAssets(currentAssets, 0, realReturn, yearsUntilRetire);
-    return {
-        achieved: projected >= target,
-        projected,
-        shortfall: Math.max(0, target - projected),
+export const calculateScenario = (scenarioType, profile, assumptions) => {
+    const realRate = realReturn(assumptions.preRetirementReturn, assumptions.inflationRate);
+    const realPostRate = realReturn(assumptions.postRetirementReturn, assumptions.inflationRate);
+    const blendedRate = (realRate + realPostRate) / 2;   // 累積期 + 提領期混合用（簡化）
+
+    // 套用情境的支出倍率
+    const adjustedProfile = {
+        ...profile,
+        // 給 scenario object 一個簡單 hook 進去用
     };
-};
 
-/**
- * 計算「需要每月再多存多少才能在目標年齡達標」
- * @returns {number} 缺口（每月）；負值代表已綽綽有餘
- */
-export const calculateMonthlyGap = ({
-    currentAge,
-    targetAge,
-    currentAssets,
-    realReturn,
-    target,
-}) => {
-    const years = targetAge - currentAge;
-    if (years <= 0) return Infinity;
-    const projected = projectFutureAssets(currentAssets, 0, realReturn, years);
-    const remainingNeed = target - projected;
-    if (remainingNeed <= 0) return 0;
-    // 反推：每年儲蓄 × annuity factor = remainingNeed
-    const annuityFactor = realReturn === 0
-        ? years
-        : (((1 + realReturn) ** years) - 1) / realReturn;
-    const annualNeeded = remainingNeed / annuityFactor;
-    return annualNeeded / 12;
-};
-
-/**
- * 產生資產成長曲線（給圖表用）
- * @returns {Array<{age: number, assets: number}>}
- */
-export const generateGrowthCurve = ({
-    currentAge,
-    currentAssets,
-    annualContribution,
-    realReturn,
-    retireAge,
-    annualExpense,
-    postReturn,
-    lifeExpectancy,
-}) => {
-    const curve = [];
-    let assets = currentAssets;
-
-    // 累積期
-    for (let age = currentAge; age <= retireAge; age += 1) {
-        curve.push({age, assets, phase: 'accumulation'});
-        assets = assets * (1 + realReturn) + annualContribution;
-    }
-
-    // 提領期：每年從投資組合提領 annualExpense
-    for (let age = retireAge + 1; age <= lifeExpectancy; age += 1) {
-        assets = (assets - annualExpense) * (1 + postReturn);
-        curve.push({age, assets: Math.max(0, assets), phase: 'withdrawal'});
-    }
-
-    return curve;
-};
-
-/**
- * 計算實質報酬率（扣除通膨後）
- * 公式：(1 + nominal) / (1 + inflation) - 1
- */
-export const realReturn = (nominalReturn, inflationRate) => (1 + nominalReturn) / (1 + inflationRate) - 1;
-
-/**
- * 給定情境定義 + 使用者狀態，回傳該情境的完整試算結果
- */
-export const calculateScenario = (scenario, profile, assumptions) => {
-    const annualExpense = profile.monthlyExpense * 12 * scenario.expenseMultiplier;
-    const portfolioNeed = annualExpense * scenario.portfolioCoverage;
-    const target = calculateRetirementTarget(portfolioNeed, assumptions.safeWithdrawalRate);
-
-    const monthlyContribution = Math.max(0, profile.monthlyIncome - profile.monthlyExpense);
-    const annualContribution = monthlyContribution * 12;
-    const rReturn = realReturn(assumptions.preRetirementReturn, assumptions.inflationRate);
-    const rPostReturn = realReturn(assumptions.postRetirementReturn, assumptions.inflationRate);
-
-    const retireAge = scenario.fixedRetireAge
+    const retireAge = scenarioType.fixedRetireAge
         || findRetirementAge({
-            currentAge: profile.currentAge,
-            currentAssets: profile.currentAssets,
-            annualContribution,
-            realReturn: rReturn,
-            target,
+            profile: adjustedProfile,
+            realReturnRate: blendedRate,
+            scenario: scenarioType,
+            lifeExpectancy: assumptions.lifeExpectancy,
         });
 
-    const monthlyGap = retireAge === null
-        ? calculateMonthlyGap({
-            currentAge: profile.currentAge,
-            targetAge: profile.targetRetireAge,
-            currentAssets: profile.currentAssets,
-            realReturn: rReturn,
-            target,
-        })
-        : 0;
+    const annualExpenseAtRetire = profile.monthlyExpense * 12 * scenarioType.expenseMultiplier;
+    const target = annualExpenseAtRetire / assumptions.safeWithdrawalRate * scenarioType.portfolioCoverage;
+
+    const monthlyContribution = Math.max(0, profile.monthlyIncome - profile.monthlyExpense);
+
+    let monthlyGap = 0;
+    let growthCurve = [];
+
+    if (retireAge !== null) {
+        // 成功 — 跑一次完整 sim 拿 trajectory
+        const sim = simulateYearByYear({
+            profile: adjustedProfile,
+            retireAge,
+            realReturnRate: blendedRate,
+            scenario: scenarioType,
+            lifeExpectancy: assumptions.lifeExpectancy,
+        });
+        growthCurve = sim.trajectory;
+    } else {
+        // 失敗 — 估算缺口
+        const sim = simulateYearByYear({
+            profile: adjustedProfile,
+            retireAge: profile.targetRetireAge,
+            realReturnRate: blendedRate,
+            scenario: scenarioType,
+            lifeExpectancy: assumptions.lifeExpectancy,
+        });
+        // 估缺口：失敗那年還欠多少 / 剩多少年複利
+        const yearsToTarget = profile.targetRetireAge - profile.currentAge;
+        if (yearsToTarget > 0 && sim.failedAge) {
+            // 粗估每月需多存
+            const shortfallTotal = annualExpenseAtRetire * (assumptions.lifeExpectancy - profile.targetRetireAge);
+            const annuityFactor = blendedRate === 0
+                ? yearsToTarget
+                : (((1 + blendedRate) ** yearsToTarget) - 1) / blendedRate;
+            monthlyGap = (shortfallTotal / annuityFactor) / 12;
+        }
+        growthCurve = sim.trajectory;
+    }
 
     return {
-        scenarioKey: scenario.key,
+        scenarioKey: scenarioType.key,
         target,
-        annualExpense,
-        portfolioNeed,
+        annualExpense: annualExpenseAtRetire,
+        portfolioNeed: annualExpenseAtRetire * scenarioType.portfolioCoverage,
         retireAge,
         yearsToRetire: retireAge === null ? null : retireAge - profile.currentAge,
         monthlyContribution,
         monthlyGap,
         achievable: retireAge !== null,
-        growthCurve: retireAge ? generateGrowthCurve({
-            currentAge: profile.currentAge,
-            currentAssets: profile.currentAssets,
-            annualContribution,
-            realReturn: rReturn,
-            retireAge,
-            annualExpense,
-            postReturn: rPostReturn,
-            lifeExpectancy: assumptions.lifeExpectancy,
-        }) : [],
+        growthCurve,
     };
 };
