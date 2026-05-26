@@ -17,6 +17,7 @@ const defaultProfile = () => ({
     targetRetireAge: 55,
     // Step 2 資產
     currentAssets: 500000,
+    emergencyFundCurrent: 100000,    // 緊急預備金（已準備）
     // Step 3 台灣專版（可選）
     twEnabled: false,
     averageInsuredSalary: 45800,
@@ -24,6 +25,7 @@ const defaultProfile = () => ({
     laborPensionBalance: 200000,
     laborPensionEmployeeRate: 0,
     nationalPensionYears: 0,
+    laborInsurancePayout: 1.0,        // 勞保給付折扣（1.0 = 拿足）
     // Step 4 假設
     assumptions: {...DEFAULT_ASSUMPTIONS},
     // 壓力測試 mode（不持久化，重整就回基準）
@@ -56,6 +58,27 @@ export const useProfileStore = defineStore('profile', {
             if (!state.monthlyIncome) return 0;
             return Math.max(0, (state.monthlyIncome - state.monthlyExpense) / state.monthlyIncome);
         },
+        // 緊急預備金狀態
+        emergencyFundTarget(state) {
+            return state.monthlyExpense * state.assumptions.emergencyFundMonths;
+        },
+        emergencyFundStatus(state) {
+            const target = this.emergencyFundTarget;
+            const current = state.emergencyFundCurrent || 0;
+            const ratio = target > 0 ? current / target : 1;
+            return {
+                target,
+                current,
+                gap: Math.max(0, target - current),
+                ratio: Math.min(1.5, ratio),  // 上限 1.5 給 UI 視覺用
+                achieved: ratio >= 1,
+                level: ratio >= 1 ? 'achieved' : ratio >= 0.5 ? 'partial' : 'low',
+            };
+        },
+        // 從現有資產扣除緊急預備金 = 可投資資產
+        investableAssets(state) {
+            return Math.max(0, state.currentAssets - (state.emergencyFundCurrent || 0));
+        },
         stressTest: (state) => (state.stressMode ? getStressTest(state.stressMode) : null),
         effectiveAssumptions(state) {
             if (!state.stressMode) return state.assumptions;
@@ -64,6 +87,7 @@ export const useProfileStore = defineStore('profile', {
         },
         scenarios(state) {
             const assumptions = this.effectiveAssumptions;
+            const investable = this.investableAssets;
             return FIRE_TYPES.map((type) => ({
                 type,
                 result: calculateScenario(type, {
@@ -71,11 +95,11 @@ export const useProfileStore = defineStore('profile', {
                     monthlyIncome: state.monthlyIncome,
                     monthlyExpense: state.monthlyExpense,
                     targetRetireAge: state.targetRetireAge,
-                    currentAssets: state.currentAssets,
+                    currentAssets: investable,
                 }, assumptions),
             }));
         },
-        twCashflow: (state) => {
+        twCashflow(state) {
             if (!state.twEnabled) return null;
             return calculateTwRetirementCashflow({
                 currentAge: state.currentAge,
@@ -86,9 +110,10 @@ export const useProfileStore = defineStore('profile', {
                 laborPensionBalance: state.laborPensionBalance,
                 laborPensionEmployeeRate: state.laborPensionEmployeeRate,
                 nationalPensionYears: state.nationalPensionYears,
+                laborInsurancePayout: state.laborInsurancePayout,
             });
         },
-        primaryScenario(state) {
+        primaryScenario() {
             return this.scenarios.find((s) => s.type.key === 'standard');
         },
         monteCarlo(state) {
@@ -101,7 +126,7 @@ export const useProfileStore = defineStore('profile', {
             const stress = this.stressTest;
             return runMonteCarlo({
                 currentAge: state.currentAge,
-                currentAssets: state.currentAssets,
+                currentAssets: this.investableAssets,
                 annualContribution: this.monthlySavings * 12,
                 annualExpense: primary.result.annualExpense,
                 retireAge: primary.result.retireAge,
@@ -139,14 +164,18 @@ export const useProfileStore = defineStore('profile', {
             try {
                 const {
                     currentAge, monthlyIncome, monthlyExpense, targetRetireAge,
-                    currentAssets, twEnabled, averageInsuredSalary, laborInsuranceYears,
+                    currentAssets, emergencyFundCurrent,
+                    twEnabled, averageInsuredSalary, laborInsuranceYears,
                     laborPensionBalance, laborPensionEmployeeRate, nationalPensionYears,
+                    laborInsurancePayout,
                     assumptions,
                 } = this;
                 window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
                     currentAge, monthlyIncome, monthlyExpense, targetRetireAge,
-                    currentAssets, twEnabled, averageInsuredSalary, laborInsuranceYears,
+                    currentAssets, emergencyFundCurrent,
+                    twEnabled, averageInsuredSalary, laborInsuranceYears,
                     laborPensionBalance, laborPensionEmployeeRate, nationalPensionYears,
+                    laborInsurancePayout,
                     assumptions,
                 }));
             } catch (e) {

@@ -94,6 +94,10 @@ export const calculateNationalPension = ({
 
 /**
  * 整合三項：給定使用者台灣專版輸入，回傳月退休現金流明細
+ *
+ * @param {number} [params.laborInsurancePayout=1.0]
+ *   勞保給付折扣（0–1）。1.0 = 拿足、0.5 = 打對折、0 = 完全拿不到。
+ *   用來反映勞保基金破產 / 改革打折的悲觀情境。勞退不受影響（勞退是個人專戶）。
  */
 export const calculateTwRetirementCashflow = ({
     currentAge,
@@ -104,14 +108,16 @@ export const calculateTwRetirementCashflow = ({
     laborPensionBalance,
     laborPensionEmployeeRate,
     nationalPensionYears,
+    laborInsurancePayout = 1.0,
 }) => {
     const yearsToClaim = Math.max(0, claimAge - currentAge);
 
-    const laborInsuranceMonthly = calculateLaborInsurance({
+    const laborInsuranceFull = calculateLaborInsurance({
         averageInsuredSalary: Math.min(monthlySalary, LABOR_INSURED_SALARY_CAP),
         yearsOfService: laborInsuranceYears + yearsToClaim,
         claimAge,
     });
+    const laborInsuranceMonthly = Math.round(laborInsuranceFull * laborInsurancePayout);
 
     const {monthlyAnnuity: laborPensionMonthly, totalBalance: laborPensionTotal} = calculateLaborPension({
         monthlySalary,
@@ -125,7 +131,9 @@ export const calculateTwRetirementCashflow = ({
         : 0;
 
     return {
+        laborInsuranceFull,
         laborInsuranceMonthly,
+        laborInsurancePayout,
         laborPensionMonthly,
         laborPensionTotal,
         nationalPensionMonthly,

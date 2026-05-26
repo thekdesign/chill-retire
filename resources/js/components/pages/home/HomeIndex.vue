@@ -119,19 +119,68 @@
                     <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-sunset-500 text-white text-sm font-bold">2</span>
                     現有資產
                 </h3>
+                <div class="grid sm:grid-cols-2 gap-5">
+                    <FormField
+                        label="總資產（含現金）"
+                        help="股票、ETF、基金、現金、定存的總和。自住房不計入"
+                    >
+                        <NumberInput
+                            v-model="profile.currentAssets"
+                            prefix="NT$"
+                            :min="0"
+                            :step="10000"
+                            format-thousands
+                            @update:model-value="onChange"
+                        />
+                    </FormField>
+                    <FormField
+                        label="其中緊急預備金"
+                        help="保留為現金、不投入股市的部分"
+                    >
+                        <NumberInput
+                            v-model="profile.emergencyFundCurrent"
+                            prefix="NT$"
+                            :min="0"
+                            :step="10000"
+                            format-thousands
+                            @update:model-value="onChange"
+                        />
+                    </FormField>
+                </div>
                 <FormField
-                    label="現有可投資資產"
-                    help="股票、ETF、基金、現金、定存的總和。自住房不計入（你不會賣它來退休）"
+                    label="緊急預備金目標"
+                    help="一般建議 3–6 個月支出；自由業者或單薪家庭建議 12 個月"
                 >
-                    <NumberInput
-                        v-model="profile.currentAssets"
-                        prefix="NT$"
+                    <RangeSlider
+                        v-model="emergencyFundMonths"
                         :min="0"
-                        :step="10000"
-                        format-thousands
-                        @update:model-value="onChange"
+                        :max="12"
+                        :step="1"
+                        :format="(v) => `${v} 個月`"
                     />
                 </FormField>
+                <div
+                    :class="[
+                        'rounded-xl px-4 py-3 text-sm border',
+                        emergencyStatus.achieved
+                            ? 'bg-matcha-50 border-matcha-200 text-matcha-700'
+                            : emergencyStatus.level === 'partial'
+                                ? 'bg-apricot-50 border-apricot-200 text-apricot-700'
+                                : 'bg-cream-100 border-cream-300 text-clay-700',
+                    ]"
+                >
+                    <template v-if="emergencyStatus.achieved">
+                        ✅ 緊急預備金已達標！
+                        目標 <strong class="font-tabular">{{ formatTwdShort(emergencyStatus.target) }}</strong>，
+                        你有 <strong class="font-tabular">{{ formatTwdShort(emergencyStatus.current) }}</strong>。
+                        可投資資產 <strong class="font-tabular">{{ formatTwdShort(investableAssets) }}</strong> 進入計算。
+                    </template>
+                    <template v-else>
+                        💡 建議準備 <strong class="font-tabular">{{ formatTwdShort(emergencyStatus.target) }}</strong>，
+                        你還差 <strong class="font-tabular">{{ formatTwdShort(emergencyStatus.gap) }}</strong>。
+                        可投資資產 <strong class="font-tabular">{{ formatTwdShort(investableAssets) }}</strong> 進入計算（已扣除目前的緊急預備金）。
+                    </template>
+                </div>
             </div>
 
             <!-- Step 3 台灣專版（可選） -->
@@ -203,6 +252,29 @@
                             @update:model-value="onEmployeeRateChange"
                         />
                     </FormField>
+                </div>
+
+                <div v-if="profile.twEnabled" class="pt-2 animate-fade-up">
+                    <div class="text-sm font-medium text-clay-700 mb-2">
+                        勞保保守度 <span class="text-xs text-clay-500 font-normal">— 假設未來勞保改革打折時，你願意按多少規劃？</span>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <button
+                            v-for="opt in payoutOptions"
+                            :key="opt.value"
+                            type="button"
+                            :class="[
+                                'text-left p-3 rounded-xl border-2 transition-all cursor-pointer',
+                                profile.laborInsurancePayout === opt.value
+                                    ? 'border-sunset-500 bg-sunset-50 shadow-soft'
+                                    : 'border-cream-200 bg-white hover:border-sunset-300 hover:bg-sunset-50/40',
+                            ]"
+                            @click="setPayout(opt.value)"
+                        >
+                            <div class="font-display font-bold text-base text-clay-900 font-tabular">{{ opt.label }}</div>
+                            <div class="text-[0.7rem] text-clay-500 leading-snug mt-0.5">{{ opt.title }}</div>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -299,6 +371,7 @@ import SunIcon from 'components/illustrations/SunIcon.vue';
 import FormField from 'components/common/FormField.vue';
 import NumberInput from 'components/common/NumberInput.vue';
 import RangeSlider from 'components/common/RangeSlider.vue';
+import {LABOR_INSURANCE_PAYOUT_OPTIONS} from 'data/laborInsurancePayout';
 
 export default {
     name: 'HomeIndex',
@@ -308,6 +381,18 @@ export default {
 
         const savingsRatePercent = computed(() => formatPercent(profile.savingsRate, 0));
         const monthlySavingsDisplay = computed(() => formatTwdShort(profile.monthlySavings));
+        const emergencyStatus = computed(() => profile.emergencyFundStatus);
+        const investableAssets = computed(() => profile.investableAssets);
+
+        const emergencyFundMonths = computed({
+            get: () => profile.assumptions.emergencyFundMonths,
+            set: (v) => profile.updateAssumption('emergencyFundMonths', v),
+        });
+
+        const setPayout = (value) => {
+            profile.laborInsurancePayout = value;
+            profile.persist();
+        };
 
         const laborPensionEmployeeRatePercent = computed({
             get: () => Math.round((profile.laborPensionEmployeeRate || 0) * 100),
@@ -343,6 +428,12 @@ export default {
 
         return {
             profile,
+            payoutOptions: LABOR_INSURANCE_PAYOUT_OPTIONS,
+            emergencyStatus,
+            investableAssets,
+            emergencyFundMonths,
+            setPayout,
+            formatTwdShort,
             savingsRatePercent,
             monthlySavingsDisplay,
             laborPensionEmployeeRatePercent,

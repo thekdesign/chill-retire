@@ -100,10 +100,22 @@
                 <p class="text-clay-600 text-sm">勞保 + 勞退 + 國民年金（若有）的月退休現金流</p>
             </header>
             <div class="bg-white rounded-blob shadow-soft border border-cream-200 p-6 sm:p-8">
+                <div
+                    v-if="profile.laborInsurancePayout < 1"
+                    class="mb-5 bg-apricot-50 border border-apricot-200 rounded-xl px-4 py-3 text-sm text-apricot-700"
+                >
+                    <div class="font-medium mb-0.5">
+                        ⚠️ 你選的勞保保守度：按法定金額的 <strong class="font-tabular">{{ Math.round(profile.laborInsurancePayout * 100) }}%</strong> 計算
+                    </div>
+                    <div class="text-xs text-apricot-600">
+                        法定全額試算為 <strong class="font-tabular">{{ formatTwd(twCashflow.laborInsuranceFull) }}</strong>／月，
+                        折扣後 <strong class="font-tabular">{{ formatTwd(twCashflow.laborInsuranceMonthly) }}</strong>／月
+                    </div>
+                </div>
                 <div class="space-y-4 mb-6">
                     <CashflowRow
                         emoji="🏛️"
-                        label="勞保老年年金"
+                        :label="profile.laborInsurancePayout < 1 ? `勞保老年年金（已打 ${Math.round(profile.laborInsurancePayout * 100)} 折）` : '勞保老年年金'"
                         :hint="`平均投保薪資 ${formatTwd(profile.averageInsuredSalary)} × ${profile.laborInsuranceYears + (65 - profile.currentAge)} 年年資 × 1.55%`"
                         :amount="twCashflow.laborInsuranceMonthly"
                         :total="twCashflow.totalMonthly"
@@ -162,7 +174,9 @@
                     <ReviewRow label="現在年齡" :value="`${profile.currentAge} 歲`" />
                     <ReviewRow label="希望退休年齡" :value="`${profile.targetRetireAge} 歲`" />
                     <ReviewRow label="月收入 / 月支出" :value="`${formatTwd(profile.monthlyIncome)} / ${formatTwd(profile.monthlyExpense)}`" />
-                    <ReviewRow label="現有資產" :value="formatTwd(profile.currentAssets)" />
+                    <ReviewRow label="總資產 / 緊急預備金" :value="`${formatTwd(profile.currentAssets)} / ${formatTwd(profile.emergencyFundCurrent)}`" />
+                    <ReviewRow label="可投資資產（已扣預備金）" :value="formatTwd(profile.investableAssets)" />
+                    <ReviewRow label="勞保保守度" :value="profile.twEnabled ? `${Math.round(profile.laborInsurancePayout * 100)}%（法定金額）` : '未啟用'" />
                     <ReviewRow label="通膨假設" :value="formatPercent(profile.assumptions.inflationRate, 1)" />
                     <ReviewRow label="退休前報酬率" :value="formatPercent(profile.assumptions.preRetirementReturn, 1)" />
                     <ReviewRow label="安全提領率" :value="formatPercent(profile.assumptions.safeWithdrawalRate, 2)" />

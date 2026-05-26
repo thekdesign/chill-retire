@@ -13,6 +13,7 @@ export const DEFAULT_ASSUMPTIONS = Object.freeze({
     salaryGrowthRate: 0.02,         // 年薪資成長 2%
     portfolioVolatility: 0.12,      // 投資組合年化波動率 12%（60/40 portfolio 歷史值）
     monteCarloIterations: 1000,     // Monte Carlo 模擬次數
+    emergencyFundMonths: 6,         // 緊急預備金目標（月支出倍數）；常見 3 / 6 / 12
 });
 
 /**
