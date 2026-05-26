@@ -54,9 +54,14 @@ const annualIncomeAt = (age, profile, retireAge) => {
 
 /**
  * 計算指定年齡的年度支出。
+ *
+ * 重要：scenario.expenseMultiplier（Lean 0.7 / Fat 1.5 等）只在「退休後」套用，
+ * 累積期一律用使用者填的當前 monthlyExpense。
+ * 這樣才符合 FIRE 變體的真實意涵：「退休後想過什麼生活水準」。
  */
 const annualExpenseAt = (age, profile, retireAge, scenario) => {
-    let expense = profile.monthlyExpense * 12 * (scenario?.expenseMultiplier || 1);
+    const multiplier = age > retireAge ? (scenario?.expenseMultiplier || 1) : 1;
+    let expense = profile.monthlyExpense * 12 * multiplier;
 
     // 小孩扶養（從 currentAge 算起 N 年內）
     const yearsFromNow = age - profile.currentAge;

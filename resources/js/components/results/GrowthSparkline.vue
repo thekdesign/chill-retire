@@ -24,6 +24,7 @@ export default {
     components: {Line},
     props: {
         points: {type: Array, required: true},
+        color: {type: String, default: CHART_COLORS.sunsetSolid},
     },
     setup(props) {
         // 找出 accumulation / withdrawal 邊界
@@ -32,13 +33,24 @@ export default {
             return lastAccum?.age || null;
         });
 
+        // 把 hex color 轉成 18% 透明的 rgba 給填色用
+        const colorWithAlpha = computed(() => {
+            const c = props.color;
+            // 簡單 hex → rgba：假設 6-digit hex
+            if (c.startsWith('#') && c.length === 7) {
+                const r = parseInt(c.slice(1, 3), 16);
+                const g = parseInt(c.slice(3, 5), 16);
+                const b = parseInt(c.slice(5, 7), 16);
+                return `rgba(${r},${g},${b},0.15)`;
+            }
+            return c;
+        });
+
         const chartData = computed(() => {
             const labels = props.points.map((p) => p.age);
-            // 累積期 dataset：有值；提領期 dataset：null（讓 Chart.js 自然斷開）
             const accumData = props.points.map((p) => (p.phase !== 'withdrawal' ? p.assets : null));
             const withdrawData = props.points.map((p) => (p.phase === 'withdrawal' ? p.assets : null));
 
-            // 為了讓 withdraw 段接續 accum 的最後一點，補一筆連接
             const accumLastIdx = props.points.findIndex((p) => p.phase === 'withdrawal');
             if (accumLastIdx > 0) {
                 withdrawData[accumLastIdx - 1] = props.points[accumLastIdx - 1].assets;
@@ -50,8 +62,8 @@ export default {
                     {
                         label: '累積期',
                         data: accumData,
-                        borderColor: CHART_COLORS.sunsetSolid,
-                        backgroundColor: CHART_COLORS.sunsetLight,
+                        borderColor: props.color,
+                        backgroundColor: colorWithAlpha.value,
                         borderWidth: 2,
                         pointRadius: 0,
                         pointHoverRadius: 4,
