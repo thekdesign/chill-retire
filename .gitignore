@@ -1,6 +1,5 @@
 node_modules/
-public/assets/
-public/.vite/
+public/
 .DS_Store
 *.log
 .env

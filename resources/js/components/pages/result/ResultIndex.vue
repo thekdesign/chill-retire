@@ -176,6 +176,7 @@
                     <ReviewRow label="月收入 / 月支出" :value="`${formatTwd(profile.monthlyIncome)} / ${formatTwd(profile.monthlyExpense)}`" />
                     <ReviewRow label="總資產 / 緊急預備金" :value="`${formatTwd(profile.currentAssets)} / ${formatTwd(profile.emergencyFundCurrent)}`" />
                     <ReviewRow label="可投資資產（已扣預備金）" :value="formatTwd(profile.investableAssets)" />
+                    <ReviewRow label="投資策略" :value="`${profile.investmentStrategy.emoji} ${profile.investmentStrategy.label}（${profile.investmentStrategy.subtitle || ''}）`" />
                     <ReviewRow label="勞保保守度" :value="profile.twEnabled ? `${Math.round(profile.laborInsurancePayout * 100)}%（法定金額）` : '未啟用'" />
                     <ReviewRow label="通膨假設" :value="formatPercent(profile.assumptions.inflationRate, 1)" />
                     <ReviewRow label="退休前報酬率" :value="formatPercent(profile.assumptions.preRetirementReturn, 1)" />

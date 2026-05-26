@@ -278,6 +278,53 @@
                 </div>
             </div>
 
+            <!-- Step 4 投資策略 -->
+            <div class="space-y-4 mb-10">
+                <h3 class="flex items-center gap-2 text-lg font-bold text-clay-800">
+                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-sunset-500 text-white text-sm font-bold">4</span>
+                    投資策略
+                </h3>
+                <p class="text-sm text-clay-600 leading-relaxed">
+                    決定你的本金怎麼長大。選了之後會自動套用對應的報酬率與波動率假設。
+                </p>
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <button
+                        v-for="s in strategies"
+                        :key="s.key"
+                        type="button"
+                        :class="[
+                            'text-left p-4 rounded-xl2 border-2 transition-all cursor-pointer',
+                            profile.investmentStrategyKey === s.key
+                                ? 'border-sunset-500 bg-sunset-50 shadow-soft ring-1 ring-sunset-200'
+                                : 'border-cream-200 bg-white hover:border-sunset-300 hover:bg-sunset-50/40 hover:-translate-y-0.5',
+                        ]"
+                        @click="profile.setInvestmentStrategy(s.key)"
+                    >
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-2xl">{{ s.emoji }}</span>
+                            <div
+                                v-if="profile.investmentStrategyKey === s.key"
+                                class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full bg-sunset-500 text-white text-[0.6rem] font-bold tracking-wider uppercase"
+                            >
+                                已選
+                            </div>
+                        </div>
+                        <div class="font-bold text-clay-900">{{ s.label }}</div>
+                        <div class="text-xs text-clay-500 font-tabular mb-2">{{ s.subtitle }}</div>
+                        <div class="text-[0.7rem] text-clay-500 leading-relaxed">
+                            預期報酬 <strong class="font-tabular text-clay-700">{{ (s.preRetirementReturn * 100).toFixed(1) }}%</strong>
+                            · 波動 <strong class="font-tabular text-clay-700">{{ (s.portfolioVolatility * 100).toFixed(0) }}%</strong>
+                        </div>
+                    </button>
+                </div>
+                <div
+                    v-if="profile.investmentStrategyKey === 'custom'"
+                    class="bg-cream-100 border border-cream-300 rounded-xl px-4 py-3 text-sm text-clay-700"
+                >
+                    ⚙️ 你目前用「自訂」設定 — 進階假設裡的報酬率或波動率被手動調整過了。點上面任何一個策略可回到 preset。
+                </div>
+            </div>
+
             <!-- 進階假設（摺疊） -->
             <details class="border border-cream-300 rounded-xl px-5 py-3 mb-10 group">
                 <summary class="cursor-pointer text-sm font-medium text-clay-700 list-none flex items-center justify-between">
@@ -372,6 +419,7 @@ import FormField from 'components/common/FormField.vue';
 import NumberInput from 'components/common/NumberInput.vue';
 import RangeSlider from 'components/common/RangeSlider.vue';
 import {LABOR_INSURANCE_PAYOUT_OPTIONS} from 'data/laborInsurancePayout';
+import {INVESTMENT_STRATEGIES} from 'data/investmentStrategies';
 
 export default {
     name: 'HomeIndex',
@@ -429,6 +477,7 @@ export default {
         return {
             profile,
             payoutOptions: LABOR_INSURANCE_PAYOUT_OPTIONS,
+            strategies: INVESTMENT_STRATEGIES,
             emergencyStatus,
             investableAssets,
             emergencyFundMonths,

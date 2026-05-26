@@ -2,6 +2,7 @@ import {defineStore} from 'pinia';
 import {DEFAULT_ASSUMPTIONS} from 'data/assumptions';
 import {FIRE_TYPES} from 'data/fireTypes';
 import {getStressTest} from 'data/stressTests';
+import {getStrategy, detectStrategy, INVESTMENT_STRATEGIES} from 'data/investmentStrategies';
 import {calculateScenario, realReturn} from 'libs/fireCalculator';
 import {calculateTwRetirementCashflow} from 'libs/twPensionCalc';
 import {runMonteCarlo} from 'libs/monteCarloSim';
@@ -10,25 +11,25 @@ const STORAGE_KEY = 'chill-retire:profile:v1';
 const isBrowser = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
 const defaultProfile = () => ({
-    // Step 1 基本
-    currentAge: 30,
-    monthlyIncome: 60000,
-    monthlyExpense: 35000,
-    targetRetireAge: 55,
-    // Step 2 資產
-    currentAssets: 500000,
-    emergencyFundCurrent: 100000,    // 緊急預備金（已準備）
-    // Step 3 台灣專版（可選）
-    twEnabled: false,
-    averageInsuredSalary: 45800,
-    laborInsuranceYears: 8,
-    laborPensionBalance: 200000,
-    laborPensionEmployeeRate: 0,
+    // Step 1 基本（參考主計處 2024 受僱員工經常性薪資中位數 NT$ 47,500）
+    currentAge: 32,
+    monthlyIncome: 47500,              // 台灣月薪中位數
+    monthlyExpense: 32000,             // 支出率約 67%
+    targetRetireAge: 60,
+    // Step 2 資產（多數人緊急預備金不足，預設低於目標）
+    currentAssets: 350000,             // 約一年薪資
+    emergencyFundCurrent: 80000,       // 約 2.5 個月支出，常見「不夠」狀態
+    // Step 3 台灣專版 — 預設啟用（這是台灣工具）
+    twEnabled: true,
+    averageInsuredSalary: 45800,       // 勞保投保薪資上限
+    laborInsuranceYears: 10,           // 32 歲約累積 10 年年資
+    laborPensionBalance: 250000,       // 對應 10 年勞退累積
+    laborPensionEmployeeRate: 0,       // 多數人沒自提
     nationalPensionYears: 0,
-    laborInsurancePayout: 1.0,        // 勞保給付折扣（1.0 = 拿足）
-    // Step 4 假設
+    laborInsurancePayout: 1.0,
+    // Step 4 假設（預設投資策略 = 平衡 60/40）
     assumptions: {...DEFAULT_ASSUMPTIONS},
-    // 壓力測試 mode（不持久化，重整就回基準）
+    // 壓力測試 mode（不持久化）
     stressMode: null,
 });
 
@@ -78,6 +79,13 @@ export const useProfileStore = defineStore('profile', {
         // 從現有資產扣除緊急預備金 = 可投資資產
         investableAssets(state) {
             return Math.max(0, state.currentAssets - (state.emergencyFundCurrent || 0));
+        },
+        // 投資策略：從目前 assumptions 反推（手動改過就變 custom）
+        investmentStrategyKey(state) {
+            return detectStrategy(state.assumptions);
+        },
+        investmentStrategy(state) {
+            return getStrategy(this.investmentStrategyKey);
         },
         stressTest: (state) => (state.stressMode ? getStressTest(state.stressMode) : null),
         effectiveAssumptions(state) {
@@ -147,6 +155,17 @@ export const useProfileStore = defineStore('profile', {
         },
         updateAssumption(key, value) {
             this.assumptions = {...this.assumptions, [key]: value};
+            this.persist();
+        },
+        setInvestmentStrategy(key) {
+            const strategy = INVESTMENT_STRATEGIES.find((s) => s.key === key);
+            if (!strategy) return;
+            this.assumptions = {
+                ...this.assumptions,
+                preRetirementReturn: strategy.preRetirementReturn,
+                postRetirementReturn: strategy.postRetirementReturn,
+                portfolioVolatility: strategy.portfolioVolatility,
+            };
             this.persist();
         },
         setStressMode(key) {
