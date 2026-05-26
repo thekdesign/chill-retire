@@ -325,6 +325,117 @@
                 </div>
             </div>
 
+            <!-- 進階生活情境（摺疊） -->
+            <details class="border border-cream-300 rounded-xl px-5 py-3 mb-4 group">
+                <summary class="cursor-pointer text-sm font-medium text-clay-700 list-none flex items-center justify-between">
+                    <span class="flex items-center gap-2">
+                        <span class="text-base">🏠</span> 進階生活情境（買房、扶養小孩）
+                        <span
+                            v-if="lifeScenariosActive"
+                            class="text-[0.65rem] px-1.5 py-0.5 rounded-full bg-sunset-100 text-sunset-700 font-bold uppercase tracking-wider"
+                        >
+                            啟用中
+                        </span>
+                    </span>
+                    <span class="text-clay-400 transition-transform group-open:rotate-180">▾</span>
+                </summary>
+                <div class="pt-5 space-y-6">
+                    <!-- 房 -->
+                    <div>
+                        <div class="text-sm font-medium text-clay-700 mb-2">
+                            🏠 房屋狀況
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 mb-3">
+                            <button
+                                v-for="opt in housingOptions"
+                                :key="opt.value"
+                                type="button"
+                                :class="[
+                                    'p-3 rounded-xl border-2 text-left transition-all cursor-pointer',
+                                    profile.housingStatus === opt.value
+                                        ? 'border-sunset-500 bg-sunset-50 shadow-soft'
+                                        : 'border-cream-200 bg-white hover:border-sunset-300',
+                                ]"
+                                @click="setHousing(opt.value)"
+                            >
+                                <div class="text-lg">{{ opt.emoji }}</div>
+                                <div class="font-bold text-xs text-clay-900 mt-0.5">{{ opt.label }}</div>
+                                <div class="text-[0.65rem] text-clay-500 mt-0.5">{{ opt.hint }}</div>
+                            </button>
+                        </div>
+                        <FormField
+                            v-if="profile.housingStatus === 'planning'"
+                            label="計畫頭期款"
+                            help="買房時要一次性付出，會從可投資資產扣除。台北 2 房約 NT$ 200–400 萬"
+                        >
+                            <NumberInput
+                                v-model="profile.housingDownPayment"
+                                prefix="NT$"
+                                :min="0"
+                                :step="100000"
+                                format-thousands
+                                @update:model-value="onChange"
+                            />
+                        </FormField>
+                    </div>
+
+                    <!-- 小孩 -->
+                    <div>
+                        <div class="flex items-baseline justify-between mb-2">
+                            <div class="text-sm font-medium text-clay-700">
+                                👶 計畫扶養小孩
+                            </div>
+                            <div class="text-sm font-tabular text-sunset-700 font-bold">
+                                {{ profile.kidsCount }} 個
+                            </div>
+                        </div>
+                        <input
+                            type="range"
+                            :value="profile.kidsCount"
+                            :min="0"
+                            :max="4"
+                            :step="1"
+                            class="chill-slider w-full mb-3"
+                            @input="updateKidsCount(Number($event.target.value))"
+                        />
+                        <div class="flex justify-between text-[0.65rem] text-clay-400 font-tabular -mt-1 mb-3">
+                            <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span>
+                        </div>
+                        <FormField
+                            v-if="profile.kidsCount > 0"
+                            label="每個小孩平均月支出"
+                            help="食衣住行 + 教育 + 育樂。台灣中位數約 NT$ 12,000–18,000"
+                        >
+                            <NumberInput
+                                v-model="profile.kidsCostPerMonth"
+                                prefix="NT$"
+                                :min="0"
+                                :step="1000"
+                                format-thousands
+                                @update:model-value="onChange"
+                            />
+                        </FormField>
+                    </div>
+
+                    <!-- 摘要 -->
+                    <div
+                        v-if="lifeScenariosActive"
+                        class="bg-cream-100 border border-cream-300 rounded-xl px-4 py-3 text-sm text-clay-700 leading-relaxed"
+                    >
+                        📝 這些生活情境會從可投資資產一次扣除預留：
+                        <ul class="mt-1.5 space-y-0.5 font-tabular text-clay-800">
+                            <li v-if="profile.housingDeduction > 0">
+                                · 房屋頭期款預留 <strong>{{ formatTwd(profile.housingDeduction) }}</strong>
+                            </li>
+                            <li v-if="profile.kidsLifetimeCost > 0">
+                                · 小孩 20 年扶養成本 <strong>{{ formatTwd(profile.kidsLifetimeCost) }}</strong>
+                                <span class="text-clay-500">（{{ profile.kidsCount }} × {{ formatTwd(profile.kidsCostPerMonth) }}/月 × 12 × 20）</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </details>
+
             <!-- 進階假設（摺疊） -->
             <details class="border border-cream-300 rounded-xl px-5 py-3 mb-10 group">
                 <summary class="cursor-pointer text-sm font-medium text-clay-700 list-none flex items-center justify-between">
@@ -420,6 +531,13 @@ import NumberInput from 'components/common/NumberInput.vue';
 import RangeSlider from 'components/common/RangeSlider.vue';
 import {LABOR_INSURANCE_PAYOUT_OPTIONS} from 'data/laborInsurancePayout';
 import {INVESTMENT_STRATEGIES} from 'data/investmentStrategies';
+import {formatTwd} from 'formatters/number/currency';
+
+const HOUSING_OPTIONS = [
+    {value: 'none', emoji: '🚫', label: '不打算買', hint: '長租或已有住處'},
+    {value: 'planning', emoji: '🏗️', label: '計畫買', hint: '5–10 年內'},
+    {value: 'owned', emoji: '🏠', label: '已買', hint: '貸款已含在月支出'},
+];
 
 export default {
     name: 'HomeIndex',
@@ -441,6 +559,20 @@ export default {
             profile.laborInsurancePayout = value;
             profile.persist();
         };
+
+        const setHousing = (value) => {
+            profile.housingStatus = value;
+            profile.persist();
+        };
+
+        const updateKidsCount = (n) => {
+            profile.kidsCount = n;
+            profile.persist();
+        };
+
+        const lifeScenariosActive = computed(() => (
+            profile.housingStatus === 'planning' || profile.kidsCount > 0
+        ));
 
         const laborPensionEmployeeRatePercent = computed({
             get: () => Math.round((profile.laborPensionEmployeeRate || 0) * 100),
@@ -478,6 +610,11 @@ export default {
             profile,
             payoutOptions: LABOR_INSURANCE_PAYOUT_OPTIONS,
             strategies: INVESTMENT_STRATEGIES,
+            housingOptions: HOUSING_OPTIONS,
+            setHousing,
+            updateKidsCount,
+            lifeScenariosActive,
+            formatTwd,
             emergencyStatus,
             investableAssets,
             emergencyFundMonths,

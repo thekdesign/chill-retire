@@ -175,7 +175,19 @@
                     <ReviewRow label="希望退休年齡" :value="`${profile.targetRetireAge} 歲`" />
                     <ReviewRow label="月收入 / 月支出" :value="`${formatTwd(profile.monthlyIncome)} / ${formatTwd(profile.monthlyExpense)}`" />
                     <ReviewRow label="總資產 / 緊急預備金" :value="`${formatTwd(profile.currentAssets)} / ${formatTwd(profile.emergencyFundCurrent)}`" />
-                    <ReviewRow label="可投資資產（已扣預備金）" :value="formatTwd(profile.investableAssets)" />
+                    <ReviewRow label="可投資資產（已扣全部預留）" :value="formatTwd(profile.investableAssets)" />
+                    <ReviewRow
+                        v-if="profile.housingStatus !== 'none'"
+                        label="房屋狀況"
+                        :value="profile.housingStatus === 'planning'
+                            ? `計畫買，頭期 ${formatTwd(profile.housingDownPayment)}`
+                            : '已買（含在月支出）'"
+                    />
+                    <ReviewRow
+                        v-if="profile.kidsCount > 0"
+                        label="扶養小孩"
+                        :value="`${profile.kidsCount} 個 × ${formatTwd(profile.kidsCostPerMonth)}/月 × 20 年 = ${formatTwd(profile.kidsLifetimeCost)}`"
+                    />
                     <ReviewRow label="投資策略" :value="`${profile.investmentStrategy.emoji} ${profile.investmentStrategy.label}（${profile.investmentStrategy.subtitle || ''}）`" />
                     <ReviewRow label="勞保保守度" :value="profile.twEnabled ? `${Math.round(profile.laborInsurancePayout * 100)}%（法定金額）` : '未啟用'" />
                     <ReviewRow label="通膨假設" :value="formatPercent(profile.assumptions.inflationRate, 1)" />

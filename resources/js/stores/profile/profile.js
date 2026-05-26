@@ -27,6 +27,12 @@ const defaultProfile = () => ({
     laborPensionEmployeeRate: 0,       // 多數人沒自提
     nationalPensionYears: 0,
     laborInsurancePayout: 1.0,
+    // 進階生活情境（摺疊區塊，預設「不買房、0 小孩」對主流程零影響）
+    housingStatus: 'none',             // 'none' | 'planning' | 'owned'
+    housingDownPayment: 1500000,       // 計畫買時的頭期款（NT$）
+    kidsCount: 0,
+    kidsCostPerMonth: 15000,           // 每個小孩月支出（粗估，可調）
+    kidsSupportYears: 20,              // 從現在算起扶養年數（簡化模型）
     // Step 4 假設（預設投資策略 = 平衡 60/40）
     assumptions: {...DEFAULT_ASSUMPTIONS},
     // 壓力測試 mode（不持久化）
@@ -76,9 +82,20 @@ export const useProfileStore = defineStore('profile', {
                 level: ratio >= 1 ? 'achieved' : ratio >= 0.5 ? 'partial' : 'low',
             };
         },
-        // 從現有資產扣除緊急預備金 = 可投資資產
+        // 房屋頭期款預留（計畫買 = 從可投資資產裡扣除；已買 = 0；不買 = 0）
+        housingDeduction(state) {
+            return state.housingStatus === 'planning' ? (state.housingDownPayment || 0) : 0;
+        },
+        // 小孩終身扶養成本（簡化：人數 × 月支出 × 12 × 扶養年數）
+        kidsLifetimeCost(state) {
+            return (state.kidsCount || 0) * (state.kidsCostPerMonth || 0) * 12 * (state.kidsSupportYears || 0);
+        },
+        // 從現有資產扣除緊急預備金 + 房屋頭期 + 小孩成本 = 真正可投入退休的資產
         investableAssets(state) {
-            return Math.max(0, state.currentAssets - (state.emergencyFundCurrent || 0));
+            const deductions = (state.emergencyFundCurrent || 0)
+                + this.housingDeduction
+                + this.kidsLifetimeCost;
+            return Math.max(0, state.currentAssets - deductions);
         },
         // 投資策略：從目前 assumptions 反推（手動改過就變 custom）
         investmentStrategyKey(state) {
@@ -187,6 +204,7 @@ export const useProfileStore = defineStore('profile', {
                     twEnabled, averageInsuredSalary, laborInsuranceYears,
                     laborPensionBalance, laborPensionEmployeeRate, nationalPensionYears,
                     laborInsurancePayout,
+                    housingStatus, housingDownPayment, kidsCount, kidsCostPerMonth, kidsSupportYears,
                     assumptions,
                 } = this;
                 window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -195,6 +213,7 @@ export const useProfileStore = defineStore('profile', {
                     twEnabled, averageInsuredSalary, laborInsuranceYears,
                     laborPensionBalance, laborPensionEmployeeRate, nationalPensionYears,
                     laborInsurancePayout,
+                    housingStatus, housingDownPayment, kidsCount, kidsCostPerMonth, kidsSupportYears,
                     assumptions,
                 }));
             } catch (e) {
