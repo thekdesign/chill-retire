@@ -1,45 +1,11 @@
 <template>
     <div v-if="points.length > 1" class="relative">
-        <svg :viewBox="`0 0 ${width} ${height}`" preserveAspectRatio="none" class="w-full h-20">
-            <!-- 累積期面積 -->
-            <path :d="accumulationArea" fill="#FFD3A1" fill-opacity="0.5" />
-            <!-- 提領期面積 -->
-            <path v-if="withdrawalArea" :d="withdrawalArea" fill="#EAE4D8" fill-opacity="0.5" />
-            <!-- 累積期線 -->
-            <path :d="accumulationLine" fill="none" stroke="#F47C1B" stroke-width="2" stroke-linecap="round" />
-            <!-- 提領期線（虛線） -->
-            <path
-                v-if="withdrawalLine"
-                :d="withdrawalLine"
-                fill="none"
-                stroke="#928570"
-                stroke-width="2"
-                stroke-dasharray="3 3"
-                stroke-linecap="round"
-            />
-            <!-- 退休年齡標記 -->
-            <line
-                v-if="retireMark"
-                :x1="retireMark.x"
-                :x2="retireMark.x"
-                y1="0"
-                :y2="height"
-                stroke="#F47C1B"
-                stroke-width="1"
-                stroke-dasharray="2 2"
-                opacity="0.5"
-            />
-            <circle
-                v-if="retireMark"
-                :cx="retireMark.x"
-                :cy="retireMark.y"
-                r="3"
-                fill="#F47C1B"
-            />
-        </svg>
+        <div class="h-24 sm:h-28">
+            <Line :data="chartData" :options="chartOptions" />
+        </div>
         <div class="flex justify-between text-[0.65rem] text-clay-500 mt-1 font-tabular">
             <span>{{ points[0].age }} 歲</span>
-            <span v-if="retirePoint" class="text-sunset-600 font-bold">↑ {{ retirePoint.age }} 歲退休</span>
+            <span v-if="retireAge" class="text-sunset-600 font-bold">↑ {{ retireAge }} 歲退休</span>
             <span>{{ points[points.length - 1].age }} 歲</span>
         </div>
     </div>
@@ -47,70 +13,95 @@
 
 <script>
 import {computed} from 'vue';
+import {Line} from 'vue-chartjs';
+import {setupChartJs, CHART_COLORS} from 'libs/chartSetup';
+import {formatTwdShort} from 'formatters/number/currency';
+
+setupChartJs();
 
 export default {
     name: 'GrowthSparkline',
+    components: {Line},
     props: {
         points: {type: Array, required: true},
     },
     setup(props) {
-        const width = 200;
-        const height = 60;
-        const padding = 4;
+        // 找出 accumulation / withdrawal 邊界
+        const retireAge = computed(() => {
+            const lastAccum = [...props.points].reverse().find((p) => p.phase === 'accumulation');
+            return lastAccum?.age || null;
+        });
 
-        const bounds = computed(() => {
-            const ages = props.points.map((p) => p.age);
-            const assets = props.points.map((p) => p.assets);
+        const chartData = computed(() => {
+            const labels = props.points.map((p) => p.age);
+            // 累積期 dataset：有值；提領期 dataset：null（讓 Chart.js 自然斷開）
+            const accumData = props.points.map((p) => (p.phase !== 'withdrawal' ? p.assets : null));
+            const withdrawData = props.points.map((p) => (p.phase === 'withdrawal' ? p.assets : null));
+
+            // 為了讓 withdraw 段接續 accum 的最後一點，補一筆連接
+            const accumLastIdx = props.points.findIndex((p) => p.phase === 'withdrawal');
+            if (accumLastIdx > 0) {
+                withdrawData[accumLastIdx - 1] = props.points[accumLastIdx - 1].assets;
+            }
+
             return {
-                minAge: Math.min(...ages),
-                maxAge: Math.max(...ages),
-                minAssets: 0,
-                maxAssets: Math.max(...assets, 1),
+                labels,
+                datasets: [
+                    {
+                        label: '累積期',
+                        data: accumData,
+                        borderColor: CHART_COLORS.sunsetSolid,
+                        backgroundColor: CHART_COLORS.sunsetLight,
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        tension: 0.25,
+                        fill: 'origin',
+                        spanGaps: false,
+                    },
+                    {
+                        label: '提領期',
+                        data: withdrawData,
+                        borderColor: CHART_COLORS.clayDashed,
+                        backgroundColor: 'rgba(146, 133, 112, 0.12)',
+                        borderWidth: 2,
+                        borderDash: [4, 4],
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        tension: 0.25,
+                        fill: 'origin',
+                        spanGaps: false,
+                    },
+                ],
             };
         });
 
-        const toXY = (p) => {
-            const {minAge, maxAge, maxAssets} = bounds.value;
-            const x = ((p.age - minAge) / (maxAge - minAge)) * (width - padding * 2) + padding;
-            const y = height - padding - (p.assets / maxAssets) * (height - padding * 2);
-            return {x, y};
-        };
+        const chartOptions = computed(() => ({
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {mode: 'index', intersect: false},
+            plugins: {
+                legend: {display: false},
+                tooltip: {
+                    backgroundColor: CHART_COLORS.clayText,
+                    titleFont: {size: 11, weight: 'normal'},
+                    bodyFont: {size: 12, weight: 'bold'},
+                    padding: 8,
+                    cornerRadius: 6,
+                    displayColors: false,
+                    callbacks: {
+                        title: (items) => `${items[0].label} 歲`,
+                        label: (item) => formatTwdShort(item.parsed.y),
+                    },
+                },
+            },
+            scales: {
+                x: {display: false},
+                y: {display: false, beginAtZero: true},
+            },
+        }));
 
-        const accumulationPoints = computed(() => props.points.filter((p) => p.phase === 'accumulation'));
-        const withdrawalPoints = computed(() => props.points.filter((p) => p.phase === 'withdrawal'));
-
-        const buildLine = (pts) => {
-            if (pts.length < 2) return '';
-            const coords = pts.map(toXY);
-            return coords.map((c, i) => `${i === 0 ? 'M' : 'L'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(' ');
-        };
-
-        const buildArea = (pts) => {
-            if (pts.length < 2) return '';
-            const coords = pts.map(toXY);
-            const top = coords.map((c, i) => `${i === 0 ? 'M' : 'L'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(' ');
-            const first = coords[0];
-            const last = coords[coords.length - 1];
-            return `${top} L ${last.x.toFixed(1)} ${(height - padding).toFixed(1)} L ${first.x.toFixed(1)} ${(height - padding).toFixed(1)} Z`;
-        };
-
-        const accumulationLine = computed(() => buildLine(accumulationPoints.value));
-        const accumulationArea = computed(() => buildArea(accumulationPoints.value));
-        const withdrawalLine = computed(() => (withdrawalPoints.value.length > 0
-            // 提領期接續累積期最後一點
-            ? buildLine([accumulationPoints.value[accumulationPoints.value.length - 1], ...withdrawalPoints.value])
-            : ''));
-        const withdrawalArea = computed(() => (withdrawalPoints.value.length > 0
-            ? buildArea([accumulationPoints.value[accumulationPoints.value.length - 1], ...withdrawalPoints.value])
-            : ''));
-
-        const retirePoint = computed(() => {
-            const acc = accumulationPoints.value;
-            return acc.length > 0 ? acc[acc.length - 1] : null;
-        });
-        const retireMark = computed(() => (retirePoint.value ? toXY(retirePoint.value) : null));
-
-        return {width, height, accumulationLine, accumulationArea, withdrawalLine, withdrawalArea, retireMark, retirePoint};
+        return {chartData, chartOptions, retireAge};
     },
 };
 </script>

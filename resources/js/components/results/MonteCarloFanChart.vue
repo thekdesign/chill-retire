@@ -1,39 +1,19 @@
 <template>
     <div v-if="percentiles && percentiles.length > 1" class="relative">
-        <svg :viewBox="`0 0 ${width} ${height}`" preserveAspectRatio="none" class="w-full h-44">
-            <!-- 10–90 percentile band（最外） -->
-            <path :d="bandOuter" fill="#FFD3A1" fill-opacity="0.4" />
-            <!-- 25–75 percentile band（中間） -->
-            <path :d="bandInner" fill="#FF9A3D" fill-opacity="0.4" />
-            <!-- 中位數線 -->
-            <path :d="medianLine" fill="none" stroke="#F47C1B" stroke-width="2" stroke-linecap="round" />
-            <!-- 0 元基線 -->
-            <line :x1="0" :y1="height" :x2="width" :y2="height" stroke="#928570" stroke-width="0.5" opacity="0.3" />
-            <!-- 退休年齡標記 -->
-            <line
-                v-if="retireMark"
-                :x1="retireMark"
-                :x2="retireMark"
-                y1="0"
-                :y2="height"
-                stroke="#F47C1B"
-                stroke-width="1"
-                stroke-dasharray="2 2"
-                opacity="0.5"
-            />
-        </svg>
-        <!-- 圖例 -->
-        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-clay-600 mt-2">
+        <div class="h-48 sm:h-56">
+            <Line :data="chartData" :options="chartOptions" />
+        </div>
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-clay-600 mt-3">
             <span class="flex items-center gap-1.5">
-                <span class="inline-block w-3 h-2 rounded-sm" style="background:#FF9A3D;opacity:0.4"></span>
+                <span class="inline-block w-3 h-2 rounded-sm" :style="{background: COLORS.apricotBandDeep}"></span>
                 25–75% 區間
             </span>
             <span class="flex items-center gap-1.5">
-                <span class="inline-block w-3 h-2 rounded-sm" style="background:#FFD3A1;opacity:0.5"></span>
+                <span class="inline-block w-3 h-2 rounded-sm" :style="{background: COLORS.apricotBand}"></span>
                 10–90% 區間
             </span>
             <span class="flex items-center gap-1.5">
-                <span class="inline-block w-3 h-0.5 bg-sunset-500"></span>
+                <span class="inline-block w-3 h-0.5" :style="{background: COLORS.sunsetSolid}"></span>
                 中位數（最常見的結果）
             </span>
         </div>
@@ -47,54 +27,118 @@
 
 <script>
 import {computed} from 'vue';
+import {Line} from 'vue-chartjs';
+import {setupChartJs, CHART_COLORS} from 'libs/chartSetup';
+import {formatTwdShort} from 'formatters/number/currency';
+
+setupChartJs();
 
 export default {
     name: 'MonteCarloFanChart',
+    components: {Line},
     props: {
         percentiles: {type: Array, required: true},
         retireAge: {type: Number, default: null},
     },
     setup(props) {
-        const width = 400;
-        const height = 140;
-        const padding = 6;
-
-        const bounds = computed(() => {
-            const ages = props.percentiles.map((p) => p.age);
-            const allValues = props.percentiles.flatMap((p) => [p.p10, p.p90]);
+        const chartData = computed(() => {
+            const labels = props.percentiles.map((p) => p.age);
             return {
-                minAge: Math.min(...ages),
-                maxAge: Math.max(...ages),
-                maxAssets: Math.max(...allValues, 1),
+                labels,
+                datasets: [
+                    // 順序對「fill: '-1'」很重要：每一條 fill 到「上一個 dataset」
+                    {
+                        label: 'p10',
+                        data: props.percentiles.map((p) => p.p10),
+                        borderColor: 'transparent',
+                        pointRadius: 0,
+                        fill: false,
+                    },
+                    {
+                        label: 'p25',
+                        data: props.percentiles.map((p) => p.p25),
+                        borderColor: 'transparent',
+                        backgroundColor: CHART_COLORS.apricotBand,
+                        pointRadius: 0,
+                        fill: '-1',     // fill p10 → p25 = 淺色帶
+                    },
+                    {
+                        label: '中位數',
+                        data: props.percentiles.map((p) => p.p50),
+                        borderColor: CHART_COLORS.sunsetSolid,
+                        backgroundColor: CHART_COLORS.apricotBandDeep,
+                        borderWidth: 2.5,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        tension: 0.2,
+                        fill: '-1',     // fill p25 → p50 = 深色帶
+                    },
+                    {
+                        label: 'p75',
+                        data: props.percentiles.map((p) => p.p75),
+                        borderColor: 'transparent',
+                        backgroundColor: CHART_COLORS.apricotBandDeep,
+                        pointRadius: 0,
+                        fill: '-1',     // fill p50 → p75 = 深色帶
+                    },
+                    {
+                        label: 'p90',
+                        data: props.percentiles.map((p) => p.p90),
+                        borderColor: 'transparent',
+                        backgroundColor: CHART_COLORS.apricotBand,
+                        pointRadius: 0,
+                        fill: '-1',     // fill p75 → p90 = 淺色帶
+                    },
+                ],
             };
         });
 
-        const toX = (age) => {
-            const {minAge, maxAge} = bounds.value;
-            return ((age - minAge) / (maxAge - minAge)) * (width - padding * 2) + padding;
-        };
-        const toY = (assets) => {
-            const {maxAssets} = bounds.value;
-            return height - padding - (assets / maxAssets) * (height - padding * 2);
-        };
+        const chartOptions = computed(() => ({
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {mode: 'index', intersect: false},
+            plugins: {
+                legend: {display: false},
+                tooltip: {
+                    backgroundColor: CHART_COLORS.clayText,
+                    titleFont: {size: 11, weight: 'normal'},
+                    bodyFont: {size: 12},
+                    padding: 10,
+                    cornerRadius: 6,
+                    filter: (item) => item.dataset.label !== 'p10' && item.dataset.label !== 'p25'
+                        && item.dataset.label !== 'p75' && item.dataset.label !== 'p90',
+                    callbacks: {
+                        title: (items) => `${items[0].label} 歲`,
+                        label: (item) => {
+                            // 顯示同一年的整組數據
+                            const idx = item.dataIndex;
+                            const p = props.percentiles[idx];
+                            return [
+                                `中位數 ${formatTwdShort(p.p50)}`,
+                                `好情境（90%）${formatTwdShort(p.p90)}`,
+                                `壞情境（10%）${formatTwdShort(p.p10)}`,
+                            ];
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    display: false,
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: (v) => formatTwdShort(v),
+                        font: {size: 10},
+                        maxTicksLimit: 4,
+                    },
+                    grid: {color: 'rgba(146, 133, 112, 0.1)'},
+                },
+            },
+        }));
 
-        const buildBand = (lowerKey, upperKey) => {
-            const pts = props.percentiles;
-            const upper = pts.map((p) => `${toX(p.age).toFixed(1)} ${toY(p[upperKey]).toFixed(1)}`);
-            const lower = pts.map((p) => `${toX(p.age).toFixed(1)} ${toY(p[lowerKey]).toFixed(1)}`).reverse();
-            return `M ${upper.join(' L ')} L ${lower.join(' L ')} Z`;
-        };
-
-        const bandOuter = computed(() => buildBand('p10', 'p90'));
-        const bandInner = computed(() => buildBand('p25', 'p75'));
-        const medianLine = computed(() => {
-            const pts = props.percentiles.map((p) => `${toX(p.age).toFixed(1)} ${toY(p.p50).toFixed(1)}`);
-            return `M ${pts.join(' L ')}`;
-        });
-
-        const retireMark = computed(() => (props.retireAge ? toX(props.retireAge) : null));
-
-        return {width, height, bandOuter, bandInner, medianLine, retireMark};
+        return {chartData, chartOptions, COLORS: CHART_COLORS};
     },
 };
 </script>
