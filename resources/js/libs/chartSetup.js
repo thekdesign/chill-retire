@@ -11,6 +11,7 @@
 
 import {
     Chart as ChartJS,
+    LineController,
     CategoryScale,
     LinearScale,
     PointElement,
@@ -24,6 +25,7 @@ let registered = false;
 export const setupChartJs = () => {
     if (registered) return;
     ChartJS.register(
+        LineController,    // 沒它就不會畫 line 圖表類型
         CategoryScale,
         LinearScale,
         PointElement,
