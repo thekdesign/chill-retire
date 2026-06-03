@@ -33,7 +33,7 @@
                     </h3>
                     <p class="text-sm opacity-90 leading-relaxed mb-4 max-w-xl">
                         知道未來退休數字，也該知道現在站在哪。class-ladder 用主計總處 / 內政部 / 財政部真實數據，
-                        7 題測出你在台灣的階層定位。
+                        9 題測出你在台灣的階層定位。
                     </p>
                     <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 backdrop-blur-sm text-sm font-bold group-hover:bg-white/30 transition-colors">
                         去 class-ladder 看看
