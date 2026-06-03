@@ -10,69 +10,93 @@ import {runMonteCarlo} from 'libs/monteCarloSim';
 const STORAGE_KEY = 'chill-retire:profile:v1';
 const isBrowser = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
+/** 預設一位伴侶的欄位（給「+ 加入伴侶」用） */
+const makeDefaultPartner = (id) => ({
+    id,
+    name: '',                          // 可選的暱稱（顯示用，沒填就 fallback「伴侶 N」）
+    age: 32,
+    monthlyIncome: 45000,
+    averageInsuredSalary: 45800,
+    laborInsuranceYears: 10,
+    laborPensionBalance: 250000,
+    laborPensionEmployeeRate: 0,
+    nationalPensionYears: 0,
+});
+
 const defaultProfile = () => ({
     // Step 1 基本（參考主計處 2024 受僱員工經常性薪資中位數 NT$ 47,500）
     currentAge: 32,
-    monthlyIncome: 47500,              // 台灣月薪中位數
-    monthlyExpense: 32000,             // 支出率約 67%
+    monthlyIncome: 47500,
+    monthlyExpense: 32000,
     targetRetireAge: 60,
-    // Step 2 資產（多數人緊急預備金不足，預設低於目標）
-    currentAssets: 350000,             // 約一年薪資
-    emergencyFundCurrent: 80000,       // 約 2.5 個月支出，常見「不夠」狀態
-    // Step 3 台灣專版 — 預設啟用（這是台灣工具）
+    // Step 2 資產
+    currentAssets: 350000,
+    emergencyFundCurrent: 80000,
+    // Step 3 台灣專版
     twEnabled: true,
-    averageInsuredSalary: 45800,       // 勞保投保薪資上限
-    laborInsuranceYears: 10,           // 32 歲約累積 10 年年資
-    laborPensionBalance: 250000,       // 對應 10 年勞退累積
-    laborPensionEmployeeRate: 0,       // 多數人沒自提
+    averageInsuredSalary: 45800,
+    laborInsuranceYears: 10,
+    laborPensionBalance: 250000,
+    laborPensionEmployeeRate: 0,
     nationalPensionYears: 0,
     laborInsurancePayout: 1.0,
-    // 💑 配偶模式（household 整合）
-    coupleEnabled: false,
-    spouseAge: 32,
-    spouseMonthlyIncome: 45000,
-    // 配偶 TW pension（couple 啟用時用）
-    spouseAverageInsuredSalary: 45800,
-    spouseLaborInsuranceYears: 10,
-    spouseLaborPensionBalance: 250000,
-    spouseLaborPensionEmployeeRate: 0,
-    spouseNationalPensionYears: 0,
-    // 進階生活情境（摺疊區塊，預設「不買房、0 小孩」對主流程零影響）
-    housingStatus: 'none',             // 'none' | 'planning' | 'owned'
-    housingDownPayment: 1500000,       // 計畫買時的頭期款（NT$）
-    housingYearsUntilPurchase: 5,      // 幾年後買
-    housingMonthlyMortgage: 25000,     // 月貸款
-    housingMortgageYears: 20,          // 貸款年限
+    // 💑 household 伴侶模式（陣列、可多人；空陣列 = 單身）
+    partners: [],
+    // 進階生活情境
+    housingStatus: 'none',
+    housingDownPayment: 1500000,
+    housingYearsUntilPurchase: 5,
+    housingMonthlyMortgage: 25000,
+    housingMortgageYears: 20,
     kidsCount: 0,
     kidsCostPerMonth: 15000,
-    kidsSupportYears: 22,              // 0 → 22 歲扶養（國際標準）
-    // 退休後 side income（顧問/兼職/版稅）
-    sideIncomeMonthly: 0,              // 0 = 沒有
-    sideIncomeStartAge: 0,             // 0 表示「從退休那年開始」
-    sideIncomeEndAge: 75,              // 預設做到 75 歲
-    // 漸進式退休（半薪過渡期）
+    kidsSupportYears: 22,
+    sideIncomeMonthly: 0,
+    sideIncomeStartAge: 0,
+    sideIncomeEndAge: 75,
     gradualEnabled: false,
-    gradualStartAge: 55,               // 從幾歲開始半薪
-    gradualPercentage: 0.5,            // 半薪 = 0.5
-    // 退休後健保自負額（多數人忽略）
+    gradualStartAge: 55,
+    gradualPercentage: 0.5,
     postRetirementNhiEnabled: true,
-    postRetirementNhiMonthly: 6400,    // 2026 級距估值（無雇主補貼）
-    // 長照預備金（晚年加速上升）
+    postRetirementNhiMonthly: 6400,
     longTermCareEnabled: false,
     longTermCareStartAge: 75,
     longTermCareMonthly: 30000,
-    // Step 4 假設（預設投資策略 = 平衡 60/40）
+    // Step 4 假設
     assumptions: {...DEFAULT_ASSUMPTIONS},
-    // 壓力測試 mode（不持久化）
+    // 暫態
     stressMode: null,
 });
+
+/**
+ * 把舊版 spouse* 欄位轉成 partners[] 結構。
+ * 寫過配偶模式的使用者重整不會被洗掉。
+ */
+const migrateSpouseToPartners = (parsed) => {
+    if (Array.isArray(parsed.partners) && parsed.partners.length > 0) return parsed;
+    if (!parsed.coupleEnabled) return parsed;
+
+    parsed.partners = [{
+        id: 1,
+        name: '',
+        age: parsed.spouseAge ?? 32,
+        monthlyIncome: parsed.spouseMonthlyIncome ?? 45000,
+        averageInsuredSalary: parsed.spouseAverageInsuredSalary ?? 45800,
+        laborInsuranceYears: parsed.spouseLaborInsuranceYears ?? 10,
+        laborPensionBalance: parsed.spouseLaborPensionBalance ?? 250000,
+        laborPensionEmployeeRate: parsed.spouseLaborPensionEmployeeRate ?? 0,
+        nationalPensionYears: parsed.spouseNationalPensionYears ?? 0,
+    }];
+    return parsed;
+};
 
 const loadFromStorage = () => {
     if (!isBrowser) return defaultProfile();
     try {
         const raw = window.localStorage.getItem(STORAGE_KEY);
         if (!raw) return defaultProfile();
-        const parsed = JSON.parse(raw);
+        let parsed = JSON.parse(raw);
+        parsed = migrateSpouseToPartners(parsed);
         return {
             ...defaultProfile(),
             ...parsed,
@@ -93,7 +117,6 @@ export const useProfileStore = defineStore('profile', {
             if (!state.monthlyIncome) return 0;
             return Math.max(0, (state.monthlyIncome - state.monthlyExpense) / state.monthlyIncome);
         },
-        // 緊急預備金狀態
         emergencyFundTarget(state) {
             return state.monthlyExpense * state.assumptions.emergencyFundMonths;
         },
@@ -102,27 +125,22 @@ export const useProfileStore = defineStore('profile', {
             const current = state.emergencyFundCurrent || 0;
             const ratio = target > 0 ? current / target : 1;
             return {
-                target,
-                current,
+                target, current,
                 gap: Math.max(0, target - current),
-                ratio: Math.min(1.5, ratio),  // 上限 1.5 給 UI 視覺用
+                ratio: Math.min(1.5, ratio),
                 achieved: ratio >= 1,
                 level: ratio >= 1 ? 'achieved' : ratio >= 0.5 ? 'partial' : 'low',
             };
         },
-        // 房屋總成本（資訊用 — 給 UI 顯示，年度模擬會分散到各年）
         housingDeduction(state) {
             return state.housingStatus === 'planning' ? (state.housingDownPayment || 0) : 0;
         },
         kidsLifetimeCost(state) {
             return (state.kidsCount || 0) * (state.kidsCostPerMonth || 0) * 12 * (state.kidsSupportYears || 0);
         },
-        // 可投資資產 = 總資產 - 緊急預備金。
-        // 房/小孩在年度模擬內逐年扣，這裡不預扣。
         investableAssets(state) {
             return Math.max(0, state.currentAssets - (state.emergencyFundCurrent || 0));
         },
-        // 投資策略：從目前 assumptions 反推（手動改過就變 custom）
         investmentStrategyKey(state) {
             return detectStrategy(state.assumptions);
         },
@@ -134,57 +152,6 @@ export const useProfileStore = defineStore('profile', {
             if (!state.stressMode) return state.assumptions;
             const stress = getStressTest(state.stressMode);
             return stress ? stress.modify(state.assumptions) : state.assumptions;
-        },
-        // 給 fireCalculator / monteCarloSim 用的「完整 profile snapshot」
-        // 把所有跟年度模擬有關的欄位打包，避免每個 getter 重複寫
-        simulationProfile(state) {
-            return {
-                currentAge: state.currentAge,
-                monthlyIncome: state.monthlyIncome,
-                monthlyExpense: state.monthlyExpense,
-                targetRetireAge: state.targetRetireAge,
-                investableAssets: this.investableAssets,
-                // 配偶
-                coupleEnabled: state.coupleEnabled,
-                spouseAge: state.spouseAge,
-                spouseMonthlyIncome: state.spouseMonthlyIncome,
-                spouseTwCashflow: this.spouseTwCashflow,
-                postRetirementExpenseRatio: this.effectiveAssumptions.postRetirementExpenseRatio,
-                // 房
-                housingStatus: state.housingStatus,
-                housingDownPayment: state.housingDownPayment,
-                housingYearsUntilPurchase: state.housingYearsUntilPurchase,
-                housingMonthlyMortgage: state.housingMonthlyMortgage,
-                housingMortgageYears: state.housingMortgageYears,
-                // 小孩
-                kidsCount: state.kidsCount,
-                kidsCostPerMonth: state.kidsCostPerMonth,
-                kidsSupportYears: state.kidsSupportYears,
-                // 退休後 side income
-                sideIncomeMonthly: state.sideIncomeMonthly,
-                sideIncomeStartAge: state.sideIncomeStartAge,
-                sideIncomeEndAge: state.sideIncomeEndAge,
-                // 漸進式退休
-                gradualEnabled: state.gradualEnabled,
-                gradualStartAge: state.gradualStartAge,
-                gradualPercentage: state.gradualPercentage,
-                // 退休後支出
-                postRetirementNhiEnabled: state.postRetirementNhiEnabled,
-                postRetirementNhiMonthly: state.postRetirementNhiMonthly,
-                longTermCareEnabled: state.longTermCareEnabled,
-                longTermCareStartAge: state.longTermCareStartAge,
-                longTermCareMonthly: state.longTermCareMonthly,
-                // 政府年金（讓 sim 65 歲後加入）
-                twCashflow: this.twCashflow,
-            };
-        },
-        scenarios(state) {
-            const assumptions = this.effectiveAssumptions;
-            const simProfile = this.simulationProfile;
-            return FIRE_TYPES.map((type) => ({
-                type,
-                result: calculateScenario(type, simProfile, assumptions),
-            }));
         },
         twCashflow(state) {
             if (!state.twEnabled) return null;
@@ -200,20 +167,77 @@ export const useProfileStore = defineStore('profile', {
                 laborInsurancePayout: state.laborInsurancePayout,
             });
         },
-        // 配偶的台灣年金（couple 啟用且 twEnabled 才有值）
-        spouseTwCashflow(state) {
-            if (!state.coupleEnabled || !state.twEnabled) return null;
-            return calculateTwRetirementCashflow({
-                currentAge: state.spouseAge,
+        /**
+         * 所有伴侶各自的台灣年金（陣列，跟 partners 對齊）
+         * 沒啟用 twEnabled 就回 []
+         */
+        partnersTwCashflow(state) {
+            if (!state.twEnabled) return [];
+            return (state.partners || []).map((p) => calculateTwRetirementCashflow({
+                currentAge: p.age,
                 claimAge: 65,
-                monthlySalary: state.spouseAverageInsuredSalary,
-                laborInsuranceYears: state.spouseLaborInsuranceYears,
-                laborPensionYears: state.spouseLaborInsuranceYears,
-                laborPensionBalance: state.spouseLaborPensionBalance,
-                laborPensionEmployeeRate: state.spouseLaborPensionEmployeeRate,
-                nationalPensionYears: state.spouseNationalPensionYears,
+                monthlySalary: p.averageInsuredSalary,
+                laborInsuranceYears: p.laborInsuranceYears,
+                laborPensionYears: p.laborInsuranceYears,
+                laborPensionBalance: p.laborPensionBalance,
+                laborPensionEmployeeRate: p.laborPensionEmployeeRate,
+                nationalPensionYears: p.nationalPensionYears,
                 laborInsurancePayout: state.laborInsurancePayout,
-            });
+            }));
+        },
+        householdSize(state) {
+            return 1 + (state.partners || []).length;
+        },
+        householdMonthlyIncome(state) {
+            const partnersIncome = (state.partners || []).reduce((sum, p) => sum + (p.monthlyIncome || 0), 0);
+            return state.monthlyIncome + partnersIncome;
+        },
+        simulationProfile(state) {
+            return {
+                currentAge: state.currentAge,
+                monthlyIncome: state.monthlyIncome,
+                monthlyExpense: state.monthlyExpense,
+                targetRetireAge: state.targetRetireAge,
+                investableAssets: this.investableAssets,
+                // 伴侶（陣列）
+                partners: state.partners,
+                partnersTwCashflow: this.partnersTwCashflow,
+                postRetirementExpenseRatio: this.effectiveAssumptions.postRetirementExpenseRatio,
+                // 房
+                housingStatus: state.housingStatus,
+                housingDownPayment: state.housingDownPayment,
+                housingYearsUntilPurchase: state.housingYearsUntilPurchase,
+                housingMonthlyMortgage: state.housingMonthlyMortgage,
+                housingMortgageYears: state.housingMortgageYears,
+                // 小孩
+                kidsCount: state.kidsCount,
+                kidsCostPerMonth: state.kidsCostPerMonth,
+                kidsSupportYears: state.kidsSupportYears,
+                // side income
+                sideIncomeMonthly: state.sideIncomeMonthly,
+                sideIncomeStartAge: state.sideIncomeStartAge,
+                sideIncomeEndAge: state.sideIncomeEndAge,
+                // 漸進式退休
+                gradualEnabled: state.gradualEnabled,
+                gradualStartAge: state.gradualStartAge,
+                gradualPercentage: state.gradualPercentage,
+                // 退休後支出
+                postRetirementNhiEnabled: state.postRetirementNhiEnabled,
+                postRetirementNhiMonthly: state.postRetirementNhiMonthly,
+                longTermCareEnabled: state.longTermCareEnabled,
+                longTermCareStartAge: state.longTermCareStartAge,
+                longTermCareMonthly: state.longTermCareMonthly,
+                // 政府年金
+                twCashflow: this.twCashflow,
+            };
+        },
+        scenarios(state) {
+            const assumptions = this.effectiveAssumptions;
+            const simProfile = this.simulationProfile;
+            return FIRE_TYPES.map((type) => ({
+                type,
+                result: calculateScenario(type, simProfile, assumptions),
+            }));
         },
         primaryScenario() {
             return this.scenarios.find((s) => s.type.key === 'standard');
@@ -260,6 +284,22 @@ export const useProfileStore = defineStore('profile', {
             };
             this.persist();
         },
+        // 👥 伴侶 CRUD
+        addPartner() {
+            const nextId = (this.partners.length === 0)
+                ? 1
+                : Math.max(...this.partners.map((p) => p.id)) + 1;
+            this.partners = [...this.partners, makeDefaultPartner(nextId)];
+            this.persist();
+        },
+        removePartner(id) {
+            this.partners = this.partners.filter((p) => p.id !== id);
+            this.persist();
+        },
+        updatePartner(id, patch) {
+            this.partners = this.partners.map((p) => (p.id === id ? {...p, ...patch} : p));
+            this.persist();
+        },
         setStressMode(key) {
             this.stressMode = this.stressMode === key ? null : key;
         },
@@ -270,10 +310,10 @@ export const useProfileStore = defineStore('profile', {
             Object.assign(this, defaultProfile());
             this.persist();
         },
-        // 從 URL 解碼來的 partial profile 套用上去（保留沒帶到的欄位用既有值）
         applyFromUrl(parsed) {
             if (!parsed || typeof parsed !== 'object') return;
-            const {assumptions, ...rest} = parsed;
+            const migrated = migrateSpouseToPartners({...parsed});
+            const {assumptions, ...rest} = migrated;
             Object.assign(this, rest);
             if (assumptions) {
                 this.assumptions = {...this.assumptions, ...assumptions};
@@ -289,9 +329,7 @@ export const useProfileStore = defineStore('profile', {
                     twEnabled, averageInsuredSalary, laborInsuranceYears,
                     laborPensionBalance, laborPensionEmployeeRate, nationalPensionYears,
                     laborInsurancePayout,
-                    coupleEnabled, spouseAge, spouseMonthlyIncome,
-                    spouseAverageInsuredSalary, spouseLaborInsuranceYears,
-                    spouseLaborPensionBalance, spouseLaborPensionEmployeeRate, spouseNationalPensionYears,
+                    partners,
                     housingStatus, housingDownPayment, housingYearsUntilPurchase,
                     housingMonthlyMortgage, housingMortgageYears,
                     kidsCount, kidsCostPerMonth, kidsSupportYears,
@@ -307,9 +345,7 @@ export const useProfileStore = defineStore('profile', {
                     twEnabled, averageInsuredSalary, laborInsuranceYears,
                     laborPensionBalance, laborPensionEmployeeRate, nationalPensionYears,
                     laborInsurancePayout,
-                    coupleEnabled, spouseAge, spouseMonthlyIncome,
-                    spouseAverageInsuredSalary, spouseLaborInsuranceYears,
-                    spouseLaborPensionBalance, spouseLaborPensionEmployeeRate, spouseNationalPensionYears,
+                    partners,
                     housingStatus, housingDownPayment, housingYearsUntilPurchase,
                     housingMonthlyMortgage, housingMortgageYears,
                     kidsCount, kidsCostPerMonth, kidsSupportYears,

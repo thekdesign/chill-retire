@@ -112,28 +112,69 @@
                     （每月可存 <span class="font-bold font-tabular">{{ monthlySavingsDisplay }}</span>）
                 </div>
 
-                <!-- 💑 配偶模式 toggle -->
-                <div class="pt-2">
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input
-                            v-model="profile.coupleEnabled"
-                            type="checkbox"
-                            class="w-5 h-5 rounded border-cream-400 text-sunset-500 focus:ring-sunset-400"
-                            @change="onChange"
-                        />
-                        <span class="text-sm text-clay-700">
-                            💑 配偶模式 <span class="text-xs text-clay-500 font-normal">— 雙薪 / 雙年金合計，月支出按 household 算（不重複）</span>
-                        </span>
-                    </label>
-                    <div v-if="profile.coupleEnabled" class="grid sm:grid-cols-3 gap-3 pt-3 pl-8 animate-fade-up">
-                        <FormField label="配偶現在年齡" hint="可跟主帳不同">
-                            <NumberInput v-model="profile.spouseAge" :min="18" :max="70" suffix="歲" @update:model-value="onChange" />
-                        </FormField>
-                        <FormField label="配偶月收入" hint="稅後實領">
-                            <NumberInput v-model="profile.spouseMonthlyIncome" prefix="NT$" :min="0" :step="1000" format-thousands @update:model-value="onChange" />
-                        </FormField>
-                        <div class="text-xs text-clay-500 self-end pb-2 leading-relaxed">
-                            假設兩人同時退休；月支出是 household 共用、不重複計算。
+                <!-- 👥 Household 伴侶（可加多人） -->
+                <div class="pt-2 space-y-3">
+                    <div class="flex items-baseline justify-between flex-wrap gap-2">
+                        <div>
+                            <div class="text-sm font-medium text-clay-700">
+                                👥 同住伴侶 <span class="text-xs text-clay-500 font-normal">— 不限傳統婚姻；薪資合計、月支出 household 共用</span>
+                            </div>
+                            <div v-if="profile.partners.length > 0" class="text-[0.7rem] text-clay-500 mt-0.5">
+                                household 共 {{ profile.householdSize }} 人 · 月收入合計 {{ formatTwd(profile.householdMonthlyIncome) }}
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sunset-500 hover:bg-sunset-600 text-white text-xs font-bold cursor-pointer transition-colors"
+                            @click="profile.addPartner()"
+                        >
+                            + 加入伴侶
+                        </button>
+                    </div>
+
+                    <div v-if="profile.partners.length > 0" class="grid sm:grid-cols-2 gap-3 animate-fade-up">
+                        <div
+                            v-for="(partner, idx) in profile.partners"
+                            :key="partner.id"
+                            class="relative bg-cream-50 border border-cream-300 rounded-xl2 p-4 space-y-3"
+                        >
+                            <div class="flex items-center justify-between gap-2">
+                                <input
+                                    :value="partner.name"
+                                    :placeholder="`伴侶 ${idx + 1}`"
+                                    class="font-bold text-sm text-clay-900 bg-transparent border-0 focus:outline-none focus:bg-white rounded px-1 -mx-1 flex-1 min-w-0"
+                                    @input="profile.updatePartner(partner.id, {name: $event.target.value})"
+                                />
+                                <button
+                                    type="button"
+                                    class="text-clay-400 hover:text-apricot-600 text-sm transition-colors cursor-pointer flex-shrink-0"
+                                    :title="`移除伴侶 ${idx + 1}`"
+                                    @click="confirmRemove(partner.id, partner.name || `伴侶 ${idx + 1}`)"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <FormField label="年齡">
+                                    <NumberInput
+                                        :model-value="partner.age"
+                                        :min="18"
+                                        :max="80"
+                                        suffix="歲"
+                                        @update:model-value="profile.updatePartner(partner.id, {age: $event})"
+                                    />
+                                </FormField>
+                                <FormField label="月收入">
+                                    <NumberInput
+                                        :model-value="partner.monthlyIncome"
+                                        prefix="NT$"
+                                        :min="0"
+                                        :step="1000"
+                                        format-thousands
+                                        @update:model-value="profile.updatePartner(partner.id, {monthlyIncome: $event})"
+                                    />
+                                </FormField>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -227,7 +268,7 @@
 
                 <div v-if="profile.twEnabled" class="grid sm:grid-cols-2 gap-5 pt-2 animate-fade-up">
                     <FormField
-                        :label="profile.coupleEnabled ? '你的勞保月投保薪資' : '勞保月投保薪資'"
+                        :label="profile.partners.length > 0 ? '你的勞保月投保薪資' : '勞保月投保薪資'"
                         help="勞保局個人專戶可查；上限 NT$ 45,800"
                     >
                         <NumberInput
@@ -241,7 +282,7 @@
                         />
                     </FormField>
                     <FormField
-                        :label="profile.coupleEnabled ? '你的勞保年資' : '目前勞保年資'"
+                        :label="profile.partners.length > 0 ? '你的勞保年資' : '目前勞保年資'"
                         help="累計參加勞保的年數"
                     >
                         <NumberInput
@@ -253,7 +294,7 @@
                         />
                     </FormField>
                     <FormField
-                        :label="profile.coupleEnabled ? '你的勞退個人專戶餘額' : '勞退個人專戶現有餘額'"
+                        :label="profile.partners.length > 0 ? '你的勞退個人專戶餘額' : '勞退個人專戶現有餘額'"
                         help="勞保局網站可查"
                     >
                         <NumberInput
@@ -280,37 +321,45 @@
                     </FormField>
                 </div>
 
-                <!-- 配偶 TW pension 欄位 -->
-                <div v-if="profile.twEnabled && profile.coupleEnabled" class="pt-3 pl-4 border-l-2 border-sunset-200 animate-fade-up">
-                    <div class="text-sm font-medium text-clay-700 mb-3">💑 配偶的勞保勞退</div>
+                <!-- 每位伴侶的 TW pension 欄位 -->
+                <div
+                    v-for="(partner, idx) in (profile.twEnabled ? profile.partners : [])"
+                    :key="`partner-tw-${partner.id}`"
+                    class="pt-3 pl-4 border-l-2 border-sunset-200 animate-fade-up"
+                >
+                    <div class="text-sm font-medium text-clay-700 mb-3">
+                        👥 {{ partner.name || `伴侶 ${idx + 1}` }} 的勞保勞退
+                    </div>
                     <div class="grid sm:grid-cols-2 gap-5">
-                        <FormField label="配偶勞保月投保薪資" help="同樣上限 NT$ 45,800">
+                        <FormField label="勞保月投保薪資" help="上限 NT$ 45,800">
                             <NumberInput
-                                v-model="profile.spouseAverageInsuredSalary"
+                                :model-value="partner.averageInsuredSalary"
                                 prefix="NT$" :min="28590" :max="45800" :step="100"
-                                format-thousands @update:model-value="onChange"
+                                format-thousands
+                                @update:model-value="profile.updatePartner(partner.id, {averageInsuredSalary: $event})"
                             />
                         </FormField>
-                        <FormField label="配偶勞保年資">
+                        <FormField label="勞保年資">
                             <NumberInput
-                                v-model="profile.spouseLaborInsuranceYears"
+                                :model-value="partner.laborInsuranceYears"
                                 suffix="年" :min="0" :max="50"
-                                @update:model-value="onChange"
+                                @update:model-value="profile.updatePartner(partner.id, {laborInsuranceYears: $event})"
                             />
                         </FormField>
-                        <FormField label="配偶勞退專戶餘額">
+                        <FormField label="勞退專戶餘額">
                             <NumberInput
-                                v-model="profile.spouseLaborPensionBalance"
+                                :model-value="partner.laborPensionBalance"
                                 prefix="NT$" :min="0" :step="10000"
-                                format-thousands @update:model-value="onChange"
+                                format-thousands
+                                @update:model-value="profile.updatePartner(partner.id, {laborPensionBalance: $event})"
                             />
                         </FormField>
-                        <FormField label="配偶勞退自提率">
+                        <FormField label="勞退自提率">
                             <RangeSlider
-                                :model-value="Math.round((profile.spouseLaborPensionEmployeeRate || 0) * 100)"
+                                :model-value="Math.round((partner.laborPensionEmployeeRate || 0) * 100)"
                                 :min="0" :max="6" :step="1"
                                 :format="(v) => `${v}%`"
-                                @update:model-value="updateSpouseEmployeeRate"
+                                @update:model-value="profile.updatePartner(partner.id, {laborPensionEmployeeRate: $event / 100})"
                             />
                         </FormField>
                     </div>
@@ -715,9 +764,10 @@ export default {
             profile.persist();
         };
 
-        const updateSpouseEmployeeRate = (v) => {
-            profile.spouseLaborPensionEmployeeRate = v / 100;
-            profile.persist();
+        const confirmRemove = (id, name) => {
+            if (window.confirm(`確定要移除「${name}」嗎？`)) {
+                profile.removePartner(id);
+            }
         };
 
         const lifeScenariosActive = computed(() => (
@@ -773,7 +823,7 @@ export default {
             setHousing,
             updateKidsCount,
             updateGradualPercent,
-            updateSpouseEmployeeRate,
+            confirmRemove,
             lifeScenariosActive,
             formatTwd,
             emergencyStatus,

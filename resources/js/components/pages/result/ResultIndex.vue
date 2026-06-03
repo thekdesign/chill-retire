@@ -14,7 +14,7 @@
                 <div class="flex items-center justify-between flex-wrap gap-3 mb-2">
                     <div class="text-sm font-medium opacity-90">
                         標準退休情境 · 維持目前生活水準
-                        <span v-if="profile.coupleEnabled" class="ml-1">· 💑 配偶模式</span>
+                        <span v-if="profile.partners.length > 0" class="ml-1">· 👥 household {{ profile.householdSize }} 人</span>
                     </div>
                     <div
                         v-if="primary.result.achievable && monteCarlo.successRate > 0"
@@ -215,15 +215,14 @@
                     <ReviewRow label="現在年齡" :value="`${profile.currentAge} 歲`" />
                     <ReviewRow label="希望退休年齡" :value="`${profile.targetRetireAge} 歲`" />
                     <ReviewRow
-                        v-if="profile.coupleEnabled"
-                        label="配偶年齡 / 月收入"
-                        :value="`${profile.spouseAge} 歲 / ${formatTwd(profile.spouseMonthlyIncome)}`"
+                        v-for="(partner, idx) in profile.partners"
+                        :key="partner.id"
+                        :label="`${partner.name || '伴侶 ' + (idx + 1)} 年齡 / 月收入`"
+                        :value="`${partner.age} 歲 / ${formatTwd(partner.monthlyIncome)}`"
                     />
                     <ReviewRow
-                        :label="profile.coupleEnabled ? '兩人合計月收入 / household 月支出' : '月收入 / 月支出'"
-                        :value="profile.coupleEnabled
-                            ? `${formatTwd(profile.monthlyIncome + profile.spouseMonthlyIncome)} / ${formatTwd(profile.monthlyExpense)}`
-                            : `${formatTwd(profile.monthlyIncome)} / ${formatTwd(profile.monthlyExpense)}`"
+                        :label="profile.partners.length > 0 ? `household 月收入合計 / 月支出（${profile.householdSize} 人共用）` : '月收入 / 月支出'"
+                        :value="`${formatTwd(profile.householdMonthlyIncome)} / ${formatTwd(profile.monthlyExpense)}`"
                     />
                     <ReviewRow label="總資產 / 緊急預備金" :value="`${formatTwd(profile.currentAssets)} / ${formatTwd(profile.emergencyFundCurrent)}`" />
                     <ReviewRow label="可投資資產（已扣全部預留）" :value="formatTwd(profile.investableAssets)" />
