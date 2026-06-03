@@ -5,3 +5,6 @@ public/
 .env
 .env.local
 .vite/
+
+# gh CLI state（gh repo create 時可能在 cwd 產生）
+.local/
