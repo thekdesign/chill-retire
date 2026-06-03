@@ -110,6 +110,9 @@
         <!-- 另存比較情境 -->
         <SavedScenariosPanel />
 
+        <!-- 姊妹站 cross-link -->
+        <SisterSiteCard />
+
         <!-- 情境比較 -->
         <section class="mb-12">
             <header class="mb-5">
@@ -278,13 +281,14 @@ import StressModeBanner from 'components/results/StressModeBanner.vue';
 import ShareButton from 'components/results/ShareButton.vue';
 import ShareLinkButton from 'components/results/ShareLinkButton.vue';
 import SavedScenariosPanel from 'components/results/SavedScenariosPanel.vue';
+import SisterSiteCard from 'components/results/SisterSiteCard.vue';
 
 export default {
     name: 'ResultIndex',
     components: {
         SunIcon, ScenarioCard, Stat, CashflowRow, ReviewRow,
         WhatIfPanel, MonteCarloSection, StressTestPanel, StressModeBanner,
-        ShareButton, ShareLinkButton, SavedScenariosPanel,
+        ShareButton, ShareLinkButton, SavedScenariosPanel, SisterSiteCard,
     },
     setup() {
         const profile = useProfileStore();
