@@ -90,8 +90,16 @@ const annualExpenseAt = (age, profile, retireAge, scenario) => {
         expense += profile.kidsCount * profile.kidsCostPerMonth * 12;
     }
 
-    // 房貸（計畫買 = 從 yearsUntilPurchase 開始付 mortgageYears 年；已買 = 假設含在 monthlyExpense 不重複）
-    if (profile.housingStatus === 'planning') {
+    // 房貸（monthlyExpense 視為不含房貸，由這裡單獨處理）
+    //   - 已買：從現在起付剩餘 housingMortgageYears 年
+    //   - 計畫買：從 yearsUntilPurchase 開始付 mortgageYears 年
+    //   - 不買：無
+    if (profile.housingStatus === 'owned') {
+        const yearsElapsed = age - profile.currentAge;
+        if (yearsElapsed < (profile.housingMortgageYears || 0)) {
+            expense += (profile.housingMonthlyMortgage || 0) * 12;
+        }
+    } else if (profile.housingStatus === 'planning') {
         const purchaseAge = profile.currentAge + (profile.housingYearsUntilPurchase || 0);
         if (age >= purchaseAge && age < purchaseAge + (profile.housingMortgageYears || 0)) {
             expense += (profile.housingMonthlyMortgage || 0) * 12;

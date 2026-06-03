@@ -95,7 +95,7 @@
                             @update:model-value="onChange"
                         />
                     </FormField>
-                    <FormField label="目前月支出" hint="日常+房租房貸+娛樂">
+                    <FormField label="目前月支出" hint="食衣住行+娛樂；房貸另外算" help="租屋族把房租算進來；房貸請填到下方「房屋狀況」">
                         <NumberInput
                             v-model="profile.monthlyExpense"
                             prefix="NT$"
@@ -486,6 +486,14 @@
                                 <NumberInput v-model="profile.housingMortgageYears" suffix="年" :min="1" :max="40" @update:model-value="onChange" />
                             </FormField>
                         </div>
+                        <div v-if="profile.housingStatus === 'owned'" class="grid sm:grid-cols-2 gap-3">
+                            <FormField label="目前月還款" help="貸款已還完就填 0">
+                                <NumberInput v-model="profile.housingMonthlyMortgage" prefix="NT$" :min="0" :step="1000" format-thousands @update:model-value="onChange" />
+                            </FormField>
+                            <FormField label="還要還幾年" help="貸款剩餘年限；還完後月支出會自動降">
+                                <NumberInput v-model="profile.housingMortgageYears" suffix="年" :min="0" :max="40" @update:model-value="onChange" />
+                            </FormField>
+                        </div>
                     </div>
 
                     <!-- 👶 小孩 -->
@@ -725,7 +733,7 @@ import {formatTwd} from 'formatters/number/currency';
 const HOUSING_OPTIONS = [
     {value: 'none', emoji: '🚫', label: '不打算買', hint: '長租或已有住處'},
     {value: 'planning', emoji: '🏗️', label: '計畫買', hint: '5–10 年內'},
-    {value: 'owned', emoji: '🏠', label: '已買', hint: '貸款已含在月支出'},
+    {value: 'owned', emoji: '🏠', label: '已買', hint: '填月還款 + 剩餘年限'},
 ];
 
 export default {
