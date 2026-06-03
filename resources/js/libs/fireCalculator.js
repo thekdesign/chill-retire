@@ -25,6 +25,9 @@ export const realReturn = (nominalReturn, inflationRate) => (1 + nominalReturn) 
  *
  * 邊界規則：retireAge 那一年算「最後一年工作」，仍有主薪資。
  * 從 retireAge + 1 開始才完全退休（NHI 自付、side income、退休後支出倍率全部套用）。
+ *
+ * 配偶模式：household 整合 — 兩人同時退休（同 retireAge），但配偶可能年齡不同，
+ * 65 歲年金各自獨立 trigger。
  */
 const annualIncomeAt = (age, profile, retireAge) => {
     let income = 0;
@@ -36,6 +39,10 @@ const annualIncomeAt = (age, profile, retireAge) => {
         } else {
             income += profile.monthlyIncome * 12;
         }
+        // 配偶薪資 — 跟主帳同時退休
+        if (profile.coupleEnabled) {
+            income += (profile.spouseMonthlyIncome || 0) * 12;
+        }
     }
 
     // 退休後 side income：retireAge + 1 起
@@ -46,9 +53,17 @@ const annualIncomeAt = (age, profile, retireAge) => {
         }
     }
 
-    // 65 歲後政府年金
+    // 65 歲後政府年金（主帳）
     if (age >= 65 && profile.twCashflow) {
         income += profile.twCashflow.totalMonthly * 12;
+    }
+
+    // 配偶 65 歲後政府年金（配偶實際年齡 = 配偶現齡 + (主帳模擬年齡 - 主帳現齡)）
+    if (profile.coupleEnabled && profile.spouseTwCashflow) {
+        const spouseActualAge = (profile.spouseAge || profile.currentAge) + (age - profile.currentAge);
+        if (spouseActualAge >= 65) {
+            income += profile.spouseTwCashflow.totalMonthly * 12;
+        }
     }
 
     return income;

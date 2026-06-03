@@ -111,6 +111,32 @@
                     <span class="font-bold text-matcha-800 font-tabular">{{ savingsRatePercent }}</span>
                     （每月可存 <span class="font-bold font-tabular">{{ monthlySavingsDisplay }}</span>）
                 </div>
+
+                <!-- 💑 配偶模式 toggle -->
+                <div class="pt-2">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input
+                            v-model="profile.coupleEnabled"
+                            type="checkbox"
+                            class="w-5 h-5 rounded border-cream-400 text-sunset-500 focus:ring-sunset-400"
+                            @change="onChange"
+                        />
+                        <span class="text-sm text-clay-700">
+                            💑 配偶模式 <span class="text-xs text-clay-500 font-normal">— 雙薪 / 雙年金合計，月支出按 household 算（不重複）</span>
+                        </span>
+                    </label>
+                    <div v-if="profile.coupleEnabled" class="grid sm:grid-cols-3 gap-3 pt-3 pl-8 animate-fade-up">
+                        <FormField label="配偶現在年齡" hint="可跟主帳不同">
+                            <NumberInput v-model="profile.spouseAge" :min="18" :max="70" suffix="歲" @update:model-value="onChange" />
+                        </FormField>
+                        <FormField label="配偶月收入" hint="稅後實領">
+                            <NumberInput v-model="profile.spouseMonthlyIncome" prefix="NT$" :min="0" :step="1000" format-thousands @update:model-value="onChange" />
+                        </FormField>
+                        <div class="text-xs text-clay-500 self-end pb-2 leading-relaxed">
+                            假設兩人同時退休；月支出是 household 共用、不重複計算。
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Step 2 資產 -->
@@ -201,7 +227,7 @@
 
                 <div v-if="profile.twEnabled" class="grid sm:grid-cols-2 gap-5 pt-2 animate-fade-up">
                     <FormField
-                        label="勞保月投保薪資"
+                        :label="profile.coupleEnabled ? '你的勞保月投保薪資' : '勞保月投保薪資'"
                         help="勞保局個人專戶可查；上限 NT$ 45,800"
                     >
                         <NumberInput
@@ -215,7 +241,7 @@
                         />
                     </FormField>
                     <FormField
-                        label="目前勞保年資"
+                        :label="profile.coupleEnabled ? '你的勞保年資' : '目前勞保年資'"
                         help="累計參加勞保的年數"
                     >
                         <NumberInput
@@ -227,7 +253,7 @@
                         />
                     </FormField>
                     <FormField
-                        label="勞退個人專戶現有餘額"
+                        :label="profile.coupleEnabled ? '你的勞退個人專戶餘額' : '勞退個人專戶現有餘額'"
                         help="勞保局網站可查"
                     >
                         <NumberInput
@@ -252,6 +278,42 @@
                             @update:model-value="onEmployeeRateChange"
                         />
                     </FormField>
+                </div>
+
+                <!-- 配偶 TW pension 欄位 -->
+                <div v-if="profile.twEnabled && profile.coupleEnabled" class="pt-3 pl-4 border-l-2 border-sunset-200 animate-fade-up">
+                    <div class="text-sm font-medium text-clay-700 mb-3">💑 配偶的勞保勞退</div>
+                    <div class="grid sm:grid-cols-2 gap-5">
+                        <FormField label="配偶勞保月投保薪資" help="同樣上限 NT$ 45,800">
+                            <NumberInput
+                                v-model="profile.spouseAverageInsuredSalary"
+                                prefix="NT$" :min="28590" :max="45800" :step="100"
+                                format-thousands @update:model-value="onChange"
+                            />
+                        </FormField>
+                        <FormField label="配偶勞保年資">
+                            <NumberInput
+                                v-model="profile.spouseLaborInsuranceYears"
+                                suffix="年" :min="0" :max="50"
+                                @update:model-value="onChange"
+                            />
+                        </FormField>
+                        <FormField label="配偶勞退專戶餘額">
+                            <NumberInput
+                                v-model="profile.spouseLaborPensionBalance"
+                                prefix="NT$" :min="0" :step="10000"
+                                format-thousands @update:model-value="onChange"
+                            />
+                        </FormField>
+                        <FormField label="配偶勞退自提率">
+                            <RangeSlider
+                                :model-value="Math.round((profile.spouseLaborPensionEmployeeRate || 0) * 100)"
+                                :min="0" :max="6" :step="1"
+                                :format="(v) => `${v}%`"
+                                @update:model-value="updateSpouseEmployeeRate"
+                            />
+                        </FormField>
+                    </div>
                 </div>
 
                 <div v-if="profile.twEnabled" class="pt-2 animate-fade-up">
@@ -640,6 +702,11 @@ export default {
             profile.persist();
         };
 
+        const updateSpouseEmployeeRate = (v) => {
+            profile.spouseLaborPensionEmployeeRate = v / 100;
+            profile.persist();
+        };
+
         const lifeScenariosActive = computed(() => (
             profile.housingStatus !== 'none'
             || profile.kidsCount > 0
@@ -688,6 +755,7 @@ export default {
             setHousing,
             updateKidsCount,
             updateGradualPercent,
+            updateSpouseEmployeeRate,
             lifeScenariosActive,
             formatTwd,
             emergencyStatus,

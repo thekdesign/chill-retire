@@ -12,7 +12,10 @@
             </div>
             <div class="relative p-8 sm:p-12 text-white">
                 <div class="flex items-center justify-between flex-wrap gap-3 mb-2">
-                    <div class="text-sm font-medium opacity-90">標準退休情境 · 維持目前生活水準</div>
+                    <div class="text-sm font-medium opacity-90">
+                        標準退休情境 · 維持目前生活水準
+                        <span v-if="profile.coupleEnabled" class="ml-1">· 💑 配偶模式</span>
+                    </div>
                     <div
                         v-if="primary.result.achievable && monteCarlo.successRate > 0"
                         class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-bold"
@@ -205,7 +208,17 @@
                 <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-2 pt-4 text-sm">
                     <ReviewRow label="現在年齡" :value="`${profile.currentAge} 歲`" />
                     <ReviewRow label="希望退休年齡" :value="`${profile.targetRetireAge} 歲`" />
-                    <ReviewRow label="月收入 / 月支出" :value="`${formatTwd(profile.monthlyIncome)} / ${formatTwd(profile.monthlyExpense)}`" />
+                    <ReviewRow
+                        v-if="profile.coupleEnabled"
+                        label="配偶年齡 / 月收入"
+                        :value="`${profile.spouseAge} 歲 / ${formatTwd(profile.spouseMonthlyIncome)}`"
+                    />
+                    <ReviewRow
+                        :label="profile.coupleEnabled ? '兩人合計月收入 / household 月支出' : '月收入 / 月支出'"
+                        :value="profile.coupleEnabled
+                            ? `${formatTwd(profile.monthlyIncome + profile.spouseMonthlyIncome)} / ${formatTwd(profile.monthlyExpense)}`
+                            : `${formatTwd(profile.monthlyIncome)} / ${formatTwd(profile.monthlyExpense)}`"
+                    />
                     <ReviewRow label="總資產 / 緊急預備金" :value="`${formatTwd(profile.currentAssets)} / ${formatTwd(profile.emergencyFundCurrent)}`" />
                     <ReviewRow label="可投資資產（已扣全部預留）" :value="formatTwd(profile.investableAssets)" />
                     <ReviewRow

@@ -27,6 +27,16 @@ const defaultProfile = () => ({
     laborPensionEmployeeRate: 0,       // 多數人沒自提
     nationalPensionYears: 0,
     laborInsurancePayout: 1.0,
+    // 💑 配偶模式（household 整合）
+    coupleEnabled: false,
+    spouseAge: 32,
+    spouseMonthlyIncome: 45000,
+    // 配偶 TW pension（couple 啟用時用）
+    spouseAverageInsuredSalary: 45800,
+    spouseLaborInsuranceYears: 10,
+    spouseLaborPensionBalance: 250000,
+    spouseLaborPensionEmployeeRate: 0,
+    spouseNationalPensionYears: 0,
     // 進階生活情境（摺疊區塊，預設「不買房、0 小孩」對主流程零影響）
     housingStatus: 'none',             // 'none' | 'planning' | 'owned'
     housingDownPayment: 1500000,       // 計畫買時的頭期款（NT$）
@@ -134,6 +144,11 @@ export const useProfileStore = defineStore('profile', {
                 monthlyExpense: state.monthlyExpense,
                 targetRetireAge: state.targetRetireAge,
                 investableAssets: this.investableAssets,
+                // 配偶
+                coupleEnabled: state.coupleEnabled,
+                spouseAge: state.spouseAge,
+                spouseMonthlyIncome: state.spouseMonthlyIncome,
+                spouseTwCashflow: this.spouseTwCashflow,
                 // 房
                 housingStatus: state.housingStatus,
                 housingDownPayment: state.housingDownPayment,
@@ -181,6 +196,21 @@ export const useProfileStore = defineStore('profile', {
                 laborPensionBalance: state.laborPensionBalance,
                 laborPensionEmployeeRate: state.laborPensionEmployeeRate,
                 nationalPensionYears: state.nationalPensionYears,
+                laborInsurancePayout: state.laborInsurancePayout,
+            });
+        },
+        // 配偶的台灣年金（couple 啟用且 twEnabled 才有值）
+        spouseTwCashflow(state) {
+            if (!state.coupleEnabled || !state.twEnabled) return null;
+            return calculateTwRetirementCashflow({
+                currentAge: state.spouseAge,
+                claimAge: 65,
+                monthlySalary: state.spouseAverageInsuredSalary,
+                laborInsuranceYears: state.spouseLaborInsuranceYears,
+                laborPensionYears: state.spouseLaborInsuranceYears,
+                laborPensionBalance: state.spouseLaborPensionBalance,
+                laborPensionEmployeeRate: state.spouseLaborPensionEmployeeRate,
+                nationalPensionYears: state.spouseNationalPensionYears,
                 laborInsurancePayout: state.laborInsurancePayout,
             });
         },
@@ -248,6 +278,9 @@ export const useProfileStore = defineStore('profile', {
                     twEnabled, averageInsuredSalary, laborInsuranceYears,
                     laborPensionBalance, laborPensionEmployeeRate, nationalPensionYears,
                     laborInsurancePayout,
+                    coupleEnabled, spouseAge, spouseMonthlyIncome,
+                    spouseAverageInsuredSalary, spouseLaborInsuranceYears,
+                    spouseLaborPensionBalance, spouseLaborPensionEmployeeRate, spouseNationalPensionYears,
                     housingStatus, housingDownPayment, housingYearsUntilPurchase,
                     housingMonthlyMortgage, housingMortgageYears,
                     kidsCount, kidsCostPerMonth, kidsSupportYears,
@@ -263,6 +296,9 @@ export const useProfileStore = defineStore('profile', {
                     twEnabled, averageInsuredSalary, laborInsuranceYears,
                     laborPensionBalance, laborPensionEmployeeRate, nationalPensionYears,
                     laborInsurancePayout,
+                    coupleEnabled, spouseAge, spouseMonthlyIncome,
+                    spouseAverageInsuredSalary, spouseLaborInsuranceYears,
+                    spouseLaborPensionBalance, spouseLaborPensionEmployeeRate, spouseNationalPensionYears,
                     housingStatus, housingDownPayment, housingYearsUntilPurchase,
                     housingMonthlyMortgage, housingMortgageYears,
                     kidsCount, kidsCostPerMonth, kidsSupportYears,
