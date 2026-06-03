@@ -107,6 +107,9 @@
         <!-- 黑天鵝壓力測試 -->
         <StressTestPanel />
 
+        <!-- 另存比較情境 -->
+        <SavedScenariosPanel />
+
         <!-- 情境比較 -->
         <section class="mb-12">
             <header class="mb-5">
@@ -245,7 +248,10 @@
 
         <!-- 行動 CTA -->
         <div class="flex flex-col items-center gap-6 pt-4">
-            <ShareButton />
+            <div class="grid sm:grid-cols-2 gap-5 w-full max-w-2xl">
+                <ShareButton />
+                <ShareLinkButton />
+            </div>
             <RouterLink
                 :to="{name: 'HOME_INDEX'}"
                 class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white hover:bg-cream-100 text-clay-700 font-medium rounded-full border border-cream-300 shadow-soft transition-colors"
@@ -270,12 +276,15 @@ import MonteCarloSection from 'components/results/MonteCarloSection.vue';
 import StressTestPanel from 'components/results/StressTestPanel.vue';
 import StressModeBanner from 'components/results/StressModeBanner.vue';
 import ShareButton from 'components/results/ShareButton.vue';
+import ShareLinkButton from 'components/results/ShareLinkButton.vue';
+import SavedScenariosPanel from 'components/results/SavedScenariosPanel.vue';
 
 export default {
     name: 'ResultIndex',
     components: {
         SunIcon, ScenarioCard, Stat, CashflowRow, ReviewRow,
-        WhatIfPanel, MonteCarloSection, StressTestPanel, StressModeBanner, ShareButton,
+        WhatIfPanel, MonteCarloSection, StressTestPanel, StressModeBanner,
+        ShareButton, ShareLinkButton, SavedScenariosPanel,
     },
     setup() {
         const profile = useProfileStore();

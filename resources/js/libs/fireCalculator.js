@@ -76,7 +76,10 @@ const annualIncomeAt = (age, profile, retireAge) => {
  * 從 retireAge + 1 起套用 scenario.expenseMultiplier + 退休後健保。
  */
 const annualExpenseAt = (age, profile, retireAge, scenario) => {
-    const multiplier = age > retireAge ? (scenario?.expenseMultiplier || 1) : 1;
+    const scenarioMul = scenario?.expenseMultiplier || 1;
+    const retirementMul = profile.postRetirementExpenseRatio || 1.0;
+    // 退休後 = 目前支出 × 場景倍率（Lean 0.7 / Fat 1.5）× 退休後比例（多數人 70-80%）
+    const multiplier = age > retireAge ? (scenarioMul * retirementMul) : 1;
     let expense = profile.monthlyExpense * 12 * multiplier;
 
     // 小孩扶養（從 currentAge 算起 N 年內）

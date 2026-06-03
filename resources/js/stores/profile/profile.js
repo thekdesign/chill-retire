@@ -149,6 +149,7 @@ export const useProfileStore = defineStore('profile', {
                 spouseAge: state.spouseAge,
                 spouseMonthlyIncome: state.spouseMonthlyIncome,
                 spouseTwCashflow: this.spouseTwCashflow,
+                postRetirementExpenseRatio: this.effectiveAssumptions.postRetirementExpenseRatio,
                 // 房
                 housingStatus: state.housingStatus,
                 housingDownPayment: state.housingDownPayment,
@@ -267,6 +268,16 @@ export const useProfileStore = defineStore('profile', {
         },
         reset() {
             Object.assign(this, defaultProfile());
+            this.persist();
+        },
+        // 從 URL 解碼來的 partial profile 套用上去（保留沒帶到的欄位用既有值）
+        applyFromUrl(parsed) {
+            if (!parsed || typeof parsed !== 'object') return;
+            const {assumptions, ...rest} = parsed;
+            Object.assign(this, rest);
+            if (assumptions) {
+                this.assumptions = {...this.assumptions, ...assumptions};
+            }
             this.persist();
         },
         persist() {

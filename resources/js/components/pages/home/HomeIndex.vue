@@ -612,6 +612,19 @@
                         />
                     </FormField>
                     <FormField
+                        label="退休後支出比例"
+                        help="退休後沒上班沒社交，多數研究顯示降到目前的 70–80%"
+                    >
+                        <RangeSlider
+                            v-model="postRetirementRatioPercent"
+                            :min="50"
+                            :max="150"
+                            :step="5"
+                            :format="(v) => `${v}%`"
+                            @update:model-value="onPostRetirementRatioChange"
+                        />
+                    </FormField>
+                    <FormField
                         label="預期壽命"
                         help="保守規劃建議拉到 90–95 歲，避免長壽風險"
                     >
@@ -736,6 +749,10 @@ export default {
             get: () => profile.assumptions.lifeExpectancy,
             set: (v) => profile.updateAssumption('lifeExpectancy', v),
         });
+        const postRetirementRatioPercent = computed({
+            get: () => Math.round(profile.assumptions.postRetirementExpenseRatio * 100),
+            set: (v) => profile.updateAssumption('postRetirementExpenseRatio', v / 100),
+        });
 
         const onChange = () => profile.persist();
         const onEmployeeRateChange = (v) => { profile.laborPensionEmployeeRate = v / 100; profile.persist(); };
@@ -743,6 +760,7 @@ export default {
         const onPreReturnChange = (v) => profile.updateAssumption('preRetirementReturn', v / 100);
         const onSwrChange = (v) => profile.updateAssumption('safeWithdrawalRate', v / 100);
         const onLifeExpectancyChange = (v) => profile.updateAssumption('lifeExpectancy', v);
+        const onPostRetirementRatioChange = (v) => profile.updateAssumption('postRetirementExpenseRatio', v / 100);
         const resetProfile = () => {
             if (window.confirm('確定要重設所有欄位嗎？')) profile.reset();
         };
@@ -770,12 +788,14 @@ export default {
             preReturnPercent,
             swrPercent,
             lifeExpectancy,
+            postRetirementRatioPercent,
             onChange,
             onEmployeeRateChange,
             onInflationChange,
             onPreReturnChange,
             onSwrChange,
             onLifeExpectancyChange,
+            onPostRetirementRatioChange,
             resetProfile,
         };
     },

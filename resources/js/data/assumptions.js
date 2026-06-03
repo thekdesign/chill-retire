@@ -14,6 +14,7 @@ export const DEFAULT_ASSUMPTIONS = Object.freeze({
     portfolioVolatility: 0.12,      // 投資組合年化波動率 12%（60/40 portfolio 歷史值）
     monteCarloIterations: 1000,     // Monte Carlo 模擬次數
     emergencyFundMonths: 6,         // 緊急預備金目標（月支出倍數）；常見 3 / 6 / 12
+    postRetirementExpenseRatio: 1.0, // 退休後支出佔目前的比例（多數研究顯示 70-80%）
 });
 
 /**

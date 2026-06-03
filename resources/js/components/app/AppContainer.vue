@@ -53,11 +53,26 @@
 </template>
 
 <script>
+import {onMounted} from 'vue';
 import SunIcon from 'components/illustrations/SunIcon.vue';
+import {useProfileStore} from 'stores/profile/profile';
+import {decodeProfileFromUrl, clearUrlHash} from 'libs/urlState';
 
 export default {
     name: 'AppContainer',
     components: {SunIcon},
+    setup() {
+        const profile = useProfileStore();
+
+        // 開啟時若 URL hash 帶 profile state，套上去並清空 hash
+        onMounted(() => {
+            const parsed = decodeProfileFromUrl();
+            if (parsed) {
+                profile.applyFromUrl(parsed);
+                clearUrlHash();
+            }
+        });
+    },
 };
 </script>
 
